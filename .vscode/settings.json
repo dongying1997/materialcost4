@@ -1,6 +1,7 @@
 {
     "conventionalCommits.scopes": [
         "all",
-        "物料库"
+        "物料库",
+        "方案管理"
     ]
 }

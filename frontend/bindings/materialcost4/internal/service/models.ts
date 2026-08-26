@@ -56,3 +56,21 @@ export interface MaterialPriceOption {
     "spec": string;
     "content": number;
 }
+
+/**
+ * SchemeExportFile 方案导出文件：JSON 数组，含导出信息字段，便于识别文件格式。
+ */
+export interface SchemeExportFile {
+    "version": number;
+    "app": string;
+    "exportedAt": string;
+    "schemes": (models$0.Scheme | null)[] | null;
+}
+
+/**
+ * SchemeImportResult 方案导入结果。
+ */
+export interface SchemeImportResult {
+    "imported": number;
+    "errors": string[] | null;
+}

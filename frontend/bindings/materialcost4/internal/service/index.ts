@@ -13,5 +13,7 @@ export {
 export type {
     CalculateInput,
     ImportResult,
-    MaterialPriceOption
+    MaterialPriceOption,
+    SchemeExportFile,
+    SchemeImportResult
 } from "./models.js";

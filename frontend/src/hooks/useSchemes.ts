@@ -1,17 +1,27 @@
 // 方案管理：方案列表、保存与删除
 import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
+import { Modal } from 'antd'
 import { ReactionService } from '../bindings'
 import type { Scheme, SchemePayload, StepRow } from '../types'
 import { stepsToPayload, stepsFromScheme, newStep } from '../utils/reaction'
+import { fileToBase64 } from '../utils/file'
 
 // 定义SchemeApi接口
 export interface SchemeApi {
   schemes: Scheme[]
+  selectedIds: number[]
+  exporting: boolean
+  importing: boolean
   loadSchemes: () => void
   saveScheme: (name: string, note: string, steps: StepRow[]) => Promise<boolean>
   loadScheme: (sch: Scheme) => Promise<void>
   deleteScheme: (sch: Scheme) => Promise<void>
+  toggleSelect: (id: number) => void
+  clearSelection: () => void
+  exportSchemes: (ids: number[]) => Promise<void>
+  importSchemes: (file: File) => Promise<boolean>
+  deleteSelected: () => Promise<void>
 }
 
 /**
@@ -24,6 +34,9 @@ export function useSchemes(
   onLoaded: (rows: StepRow[]) => void,
 ): SchemeApi {
   const [schemes, setSchemes] = useState<Scheme[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   // 加载方案列表
   const loadSchemes = useCallback(async () => {
@@ -69,11 +82,77 @@ export function useSchemes(
     try {
       await ReactionService.DeleteScheme(sch.id)
       messageApi.success('已删除')
+      setSelectedIds((prev) => prev.filter((id) => id !== sch.id))
       loadSchemes()
     } catch (e) {
       messageApi.error(String(e))
     }
   }
 
-  return { schemes, loadSchemes, saveScheme, loadScheme, deleteScheme }
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+  const clearSelection = () => setSelectedIds([])
+
+  const exportSchemes = async (ids: number[]) => {
+    setExporting(true)
+    try {
+      const path = await ReactionService.ExportSchemesToFile(ids)
+      if (path) messageApi.success(`已导出 ${ids.length || schemes.length} 个方案到 ${path}`)
+    } catch (e) {
+      messageApi.error(String(e))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const importSchemes = async (file: File) => {
+    setImporting(true)
+    try {
+      const b64 = await fileToBase64(file)
+      const result = await ReactionService.ImportSchemes(b64)
+      const r = result as any
+      messageApi.success(`导入完成：成功导入 ${r.imported ?? 0} 个方案`)
+      if (r.errors && r.errors.length) {
+        Modal.warning({ title: '导入中的问题', content: r.errors.join('\n') })
+      }
+      loadSchemes()
+    } catch (e) {
+      messageApi.error(String(e))
+    } finally {
+      setImporting(false)
+    }
+    return false
+  }
+
+  const deleteSelected = async () => {
+    const n = selectedIds.length
+    if (n === 0) return
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: `删除选中的 ${n} 个方案？`,
+        content: '该操作不可恢复。',
+        okButtonProps: { danger: true },
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
+    try {
+      for (const id of selectedIds) {
+        await ReactionService.DeleteScheme(id)
+      }
+      messageApi.success(`已删除 ${n} 个方案`)
+      setSelectedIds([])
+      loadSchemes()
+    } catch (e) {
+      messageApi.error(String(e))
+    }
+  }
+
+  return {
+    schemes, selectedIds, exporting, importing,
+    loadSchemes, saveScheme, loadScheme, deleteScheme,
+    toggleSelect, clearSelection, exportSchemes, importSchemes, deleteSelected,
+  }
 }

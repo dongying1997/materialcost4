@@ -1,7 +1,13 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"materialcost4/internal/db"
 	"materialcost4/internal/engine"
@@ -191,4 +197,139 @@ func (s *ReactionService) SaveScheme(sch *models.Scheme) (*models.Scheme, error)
 // DeleteScheme 删除方案。
 func (s *ReactionService) DeleteScheme(id int64) error {
 	return s.schemeRepo.Delete(id)
+}
+
+// ---- 方案 JSON 导出 / 导入 ----
+
+// SchemeExportFile 方案导出文件：JSON 数组，含导出信息字段，便于识别文件格式。
+type SchemeExportFile struct {
+	Version   int              `json:"version"`
+	App       string           `json:"app"`
+	ExportedAt string          `json:"exportedAt"`
+	Schemes   []*models.Scheme `json:"schemes"`
+}
+
+// ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
+// ids 为空表示导出全部方案。返回保存的文件路径（用户取消时为空字符串）。
+// 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
+func (s *ReactionService) ExportSchemesToFile(ids []int64) (string, error) {
+	export, err := s.ExportSchemes(ids)
+	if err != nil {
+		return "", fmt.Errorf("生成导出文件失败：%w", err)
+	}
+	data, err := json.MarshalIndent(export, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("序列化失败：%w", err)
+	}
+	app := application.Get()
+	if app == nil {
+		return "", fmt.Errorf("应用未就绪")
+	}
+	path, err := app.Dialog.SaveFile().SetFilename("方案导出.json").
+		AddFilter("JSON 文件", "*.json").
+		PromptForSingleSelection()
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // 用户取消
+	}
+	if filepath.Ext(path) == "" {
+		path += ".json"
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("写入文件失败：%w", err)
+	}
+	return path, nil
+}
+
+// ExportSchemes 导出选中方案为 SchemeExportFile（纯函数，便于测试）。
+func (s *ReactionService) ExportSchemes(ids []int64) (*SchemeExportFile, error) {
+	selected := map[int64]bool{}
+	for _, id := range ids {
+		selected[id] = true
+	}
+	all, err := s.schemeRepo.List()
+	if err != nil {
+		return nil, err
+	}
+	export := &SchemeExportFile{
+		Version:    1,
+		App:        "MaterialCost4",
+		ExportedAt: time.Now().Format("2006-01-02 15:04:05"),
+		Schemes:    []*models.Scheme{},
+	}
+	for _, sch := range all {
+		if len(ids) == 0 || selected[sch.ID] {
+			export.Schemes = append(export.Schemes, sch)
+		}
+	}
+	return export, nil
+}
+
+// ImportSchemesFromFile 弹出打开对话框选择 JSON 文件并导入方案。
+// 返回导入结果与出现的问题（文件为空或无方案时返回错误）。
+func (s *ReactionService) ImportSchemesFromFile() (*SchemeImportResult, error) {
+	app := application.Get()
+	if app == nil {
+		return nil, fmt.Errorf("应用未就绪")
+	}
+	path, err := app.Dialog.OpenFile().
+		AddFilter("JSON 文件", "*.json").
+		PromptForSingleSelection()
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, nil // 用户取消
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("读取文件失败：%w", err)
+	}
+	return s.ImportSchemes(data)
+}
+
+// SchemeImportResult 方案导入结果。
+type SchemeImportResult struct {
+	Imported int      `json:"imported"`
+	Errors   []string `json:"errors"`
+}
+
+// ImportSchemes 解析 JSON 内容并导入方案（name 为空或 steps 为空的方案跳过）。
+// 兼容两种结构：数组（[scheme, ...]）或 {version, app, schemes:[...]} 包裹格式。
+func (s *ReactionService) ImportSchemes(data []byte) (*SchemeImportResult, error) {
+	result := &SchemeImportResult{Errors: []string{}}
+	// 先尝试数组结构
+	var list []*models.Scheme
+	if err := json.Unmarshal(data, &list); err != nil {
+		// 再尝试导出文件结构
+		var file SchemeExportFile
+		if err2 := json.Unmarshal(data, &file); err2 != nil || file.Schemes == nil {
+			return nil, fmt.Errorf("无法解析 JSON 文件：不是有效的方案导出文件")
+		}
+		list = file.Schemes
+	}
+	if len(list) == 0 {
+		return result, nil
+	}
+	for i, sch := range list {
+		if sch == nil {
+			continue
+		}
+		sch.ID = 0 // 导入为新建，避免覆盖已有方案
+		if sch.Name == "" {
+			result.Errors = append(result.Errors, fmt.Sprintf("第 %d 项：方案名称缺失，已跳过", i+1))
+			continue
+		}
+		if sch.Steps == nil {
+			sch.Steps = []models.ReactionStep{}
+		}
+		if _, err := s.schemeRepo.Insert(sch); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("第 %d 项「%s」导入失败：%s", i+1, sch.Name, err.Error()))
+			continue
+		}
+		result.Imported++
+	}
+	return result, nil
 }

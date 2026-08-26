@@ -38,6 +38,22 @@ export function DeleteScheme(id: number): $CancellablePromise<void> {
 }
 
 /**
+ * ExportSchemes 导出选中方案为 SchemeExportFile（纯函数，便于测试）。
+ */
+export function ExportSchemes(ids: number[] | null): $CancellablePromise<$models.SchemeExportFile | null> {
+    return $Call.ByID(973350309, ids);
+}
+
+/**
+ * ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
+ * ids 为空表示导出全部方案。返回保存的文件路径（用户取消时为空字符串）。
+ * 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
+ */
+export function ExportSchemesToFile(ids: number[] | null): $CancellablePromise<string> {
+    return $Call.ByID(3174661778, ids);
+}
+
+/**
  * FormatMoney 暴露给前端格式化金额。
  */
 export function FormatMoney(v: number): $CancellablePromise<string> {
@@ -49,6 +65,22 @@ export function FormatMoney(v: number): $CancellablePromise<string> {
  */
 export function GetScheme(id: number): $CancellablePromise<models$0.Scheme | null> {
     return $Call.ByID(1733746088, id);
+}
+
+/**
+ * ImportSchemes 解析 JSON 内容并导入方案（name 为空或 steps 为空的方案跳过）。
+ * 兼容两种结构：数组（[scheme, ...]）或 {version, app, schemes:[...]} 包裹格式。
+ */
+export function ImportSchemes(data: string | null): $CancellablePromise<$models.SchemeImportResult | null> {
+    return $Call.ByID(2305019508, data);
+}
+
+/**
+ * ImportSchemesFromFile 弹出打开对话框选择 JSON 文件并导入方案。
+ * 返回导入结果与出现的问题（文件为空或无方案时返回错误）。
+ */
+export function ImportSchemesFromFile(): $CancellablePromise<$models.SchemeImportResult | null> {
+    return $Call.ByID(868637802);
 }
 
 /**
