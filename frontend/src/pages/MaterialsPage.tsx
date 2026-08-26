@@ -23,7 +23,7 @@ function MaterialsPage() {
         onDownloadTemplate={m.downloadTemplate}
         onExport={m.openExport}
       />
-      <div style={{ overflow: 'auto', minHeight: 0 }}>
+      <div style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <MaterialsTable
           list={m.list}
           loading={m.loading}

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useRef } from 'react'
 import { Table, Space, Button, Tooltip, Popconfirm } from 'antd'
 import { HistoryOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -15,6 +15,17 @@ interface Props {
 
 /** 物料列表表格：含当前价格与操作列 */
 function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
+  const [pageSize, setPageSize] = useState(20)
+  const [current, setCurrent] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  /** 切换页码后把可滚动区域滚回顶部，避免停留在新页底部 */
+  const handlePageChange = (page: number, size: number) => {
+    setCurrent(page)
+    setPageSize(size)
+    scrollRef.current?.scrollTo({ top: 0 })
+  }
+
   const columns = useMemo<ColumnsType<MaterialWithPrice>>(() => [
     { title: '编码', dataIndex: 'code', width: 70, align: 'center',render: v => v || '-' },
     { title: '名称', dataIndex: 'name', width: 130, render: v => v || '-' },
@@ -44,14 +55,21 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
   ], [onEdit, onDelete, onPrice])
 
   return (
-    <Table
-      rowKey="id"
-      loading={loading}
-      dataSource={list}
-      columns={columns}
-      pagination={{ pageSize: 20, showSizeChanger: true, showTotal: t => `共 ${t} 条` }}
-      size="middle"
-    />
+    <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <Table
+        rowKey="id"
+        loading={loading}
+        dataSource={list}
+        columns={columns}
+        pagination={{
+          current, pageSize,
+          showSizeChanger: true,
+          showTotal: t => `共 ${t} 条`,
+          onChange: handlePageChange,
+        }}
+        size="middle"
+      />
+    </div>
   )
 }
 
