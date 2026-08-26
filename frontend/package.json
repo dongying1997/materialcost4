@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
+    "@plq/use-persisted-state": "^1.4.5",
     "@wailsio/runtime": "latest",
     "antd": "^6.6.1",
     "dayjs": "^1.11.23",

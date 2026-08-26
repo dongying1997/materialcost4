@@ -5,22 +5,11 @@ import { MaterialService, ReactionService } from '../bindings'
 import type {
   MaterialWithPrice, StepRow, MultiStepResult, MaterialPriceOption,
 } from '../types'
-import { newStep, stepsToPayload, stepsFromScheme } from '../utils/reaction'
+import { newStep, stepsToPayload } from '../utils/reaction'
+import { usePersistedState } from './useStorage'
 
 const STORAGE_KEY = 'materialcost4:reaction-steps'
 
-/** 从 localStorage 恢复上次的步骤编辑内容（payload 形式，无则返回 null） */
-function loadStoredSteps(): StepRow[] | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.length === 0) return null
-    return stepsFromScheme(parsed)
-  } catch {
-    return null
-  }
-}
 
 export interface ReactionCalcApi {
   steps: StepRow[]
@@ -39,7 +28,7 @@ export interface ReactionCalcApi {
 
 /** 反应计算主状态：步骤编辑行、物料库、计算结果与实时计算（步骤内容持久化到 localStorage） */
 export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
-  const [steps, setSteps] = useState<StepRow[]>(() => loadStoredSteps() ?? [newStep()])
+  const [steps, setSteps] = usePersistedState(STORAGE_KEY, [newStep()])
   const [materials, setMaterials] = useState<MaterialWithPrice[]>([])
   const [result, setResult] = useState<MultiStepResult | null>(null)
   const [calculating, setCalculating] = useState(false)
@@ -50,15 +39,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     if (steps.length === 0) setSteps([newStep()])
   }, [steps.length])
 
-  // 步骤内容持久化：切换页面 / 退出程序后保留编辑进度（防抖写入）
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stepsToPayload(steps)))
-      } catch { /* 存储失败时忽略，不影响编辑 */ }
-    }, 400)
-    return () => clearTimeout(t)
-  }, [steps])
+  
 
   // 加载物料库
   const loadMaterials = useCallback(async () => {
@@ -111,10 +92,6 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const clearAll = () => {
     setSteps([newStep()])
     setResult(null)
-    // 清空后同时清除本地存储，避免退出后再进入时内容「复活」
-    try {
-      localStorage.removeItem(STORAGE_KEY)
-    } catch { /* ignore */ }
   }
 
   // 拉取某物料的价格选项

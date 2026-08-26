@@ -1,9 +1,10 @@
-import { useMemo, useState, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Table, Space, Button, Tooltip, Popconfirm } from 'antd'
 import { HistoryOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { MaterialWithPrice } from '../types'
 import { fmtMoney } from '../utils/file'
+import { usePersistedState } from '../hooks/useStorage'
 
 interface Props {
   list: MaterialWithPrice[]
@@ -15,8 +16,8 @@ interface Props {
 
 /** 物料列表表格：含当前价格与操作列 */
 function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
-  const [pageSize, setPageSize] = useState(20)
-  const [current, setCurrent] = useState(1)
+  const [pageSize, setPageSize] = usePersistedState("pageSize", 20)
+  const [current, setCurrent] = usePersistedState("current", 1)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   /** 切换页码后把可滚动区域滚回顶部，避免停留在新页底部 */
