@@ -16,7 +16,7 @@ interface Props {
 /** 物料列表表格：含当前价格与操作列 */
 function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
   const columns = useMemo<ColumnsType<MaterialWithPrice>>(() => [
-    { title: '编码', dataIndex: 'code', width: 50, align: 'center',render: v => v || '-' },
+    { title: '编码', dataIndex: 'code', width: 70, align: 'center',render: v => v || '-' },
     { title: '名称', dataIndex: 'name', width: 130, render: v => v || '-' },
     { title: 'CAS', dataIndex: 'cas', width: 100, render: v => v || '-' },
     { title: '化学式', dataIndex: 'formula', width: 100, render: v => v || '-' },
