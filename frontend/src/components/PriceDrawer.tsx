@@ -108,14 +108,14 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
           dataSource={prices}
           pagination={false}
           columns={[
-            { title: '价格', dataIndex: 'price', width: 110, align: 'right', render: v => fmtMoney(v) },
-            { title: '单位', dataIndex: 'unit', width: 80 },
-            { title: '供应商', dataIndex: 'supplier', width: 120, render: v => v || '-' },
-            { title: '日期', dataIndex: 'date', width: 110 },
+            { title: '价格', dataIndex: 'price', width: 50, align: 'center', render: v => fmtMoney(v) },
+            { title: '单位', dataIndex: 'unit', width: 80, align: 'center' },
+            { title: '供应商', dataIndex: 'supplier', width: 120, align: 'center', render: v => v || '-' },
+            { title: '日期', dataIndex: 'date', width: 120 , align: 'center',render: v => dayjs(v).format('YYYY-MM-DD') },
             { title: '规格', dataIndex: 'spec', width: 100, render: v => v || '-' },
-            { title: '含量%', dataIndex: 'content', width: 70, align: 'right', render: v => (v ? `${v}%` : '-') },
+            { title: '含量%', dataIndex: 'content', width: 70, align: 'center', render: v => (v ? `${v}%` : '-') },
             {
-              title: '操作', width: 110,
+              title: '操作', width: 110,align: 'center',
               render: (_, r) => (
                 <Space size={0}>
                   <Button size="small" type="link" icon={<EditOutlined />} onClick={() => openEdit(r)}>编辑</Button>
