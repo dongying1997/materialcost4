@@ -31,6 +31,24 @@ export function DownloadTemplateToFile(): $CancellablePromise<string> {
 }
 
 /**
+ * ExportMaterials 导出全部物料为 xlsx 字节。
+ * allPrices 为 false 时每物料一行（当前最新价格）；true 时每条价格记录一行（物料字段重复，无价格物料也出一行）。
+ */
+export function ExportMaterials(allPrices: boolean): $CancellablePromise<string | null> {
+    return $Call.ByID(446214845, allPrices);
+}
+
+/**
+ * ExportMaterialsToFile 导出全部物料，弹出保存对话框并写入文件。
+ * allPrices 为 false 时导出最新价格，true 时导出所有价格（多条时每价格一行）。
+ * 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
+ * 返回保存的文件路径（用户取消时为空字符串）。
+ */
+export function ExportMaterialsToFile(allPrices: boolean): $CancellablePromise<string> {
+    return $Call.ByID(2223970618, allPrices);
+}
+
+/**
  * ImportFromBytes 解析 Excel 并导入物料与价格。
  */
 export function ImportFromBytes(data: string | null, filename: string): $CancellablePromise<$models.ImportResult | null> {

@@ -10,6 +10,8 @@ export interface MaterialsApi {
   list: MaterialWithPrice[]
   loading: boolean
   importing: boolean
+  exporting: boolean
+  exportOpen: boolean
   form: ReturnType<typeof Form.useForm>[0]
   editOpen: boolean
   editing: Material | null
@@ -23,6 +25,9 @@ export interface MaterialsApi {
   deleteMaterial: (m: MaterialWithPrice) => Promise<void>
   onImport: (file: File) => Promise<boolean>
   downloadTemplate: () => Promise<void>
+  openExport: () => void
+  closeExport: () => void
+  doExport: (allPrices: boolean) => Promise<void>
   openPrice: (m: MaterialWithPrice | null) => void
 }
 
@@ -35,6 +40,8 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const [editing, setEditing] = useState<Material | null>(null)
   const [drawerMaterial, setDrawerMaterial] = useState<MaterialWithPrice | null>(null)
   const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [form] = Form.useForm()
 
   const load = useCallback(async (kw = keyword) => {
@@ -135,12 +142,28 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
     }
   }
 
+  const doExport = async (allPrices: boolean) => {
+    setExporting(true)
+    try {
+      const path = await ExcelService.ExportMaterialsToFile(allPrices)
+      if (path) messageApi.success(`已导出 ${list.length} 条物料到 ${path}`)
+    } catch (e) {
+      messageApi.error(String(e))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const openExport = () => setExportOpen(true)
+  const closeExport = () => setExportOpen(false)
+
   const openPrice = (m: MaterialWithPrice | null) => setDrawerMaterial(m)
 
   return {
-    list, loading, importing, form,
+    list, loading, importing, exporting, exportOpen, form,
     editOpen, editing, drawerMaterial,
     search, refresh, openCreate, openEdit, closeEdit,
-    saveMaterial, deleteMaterial, onImport, downloadTemplate, openPrice,
+    saveMaterial, deleteMaterial, onImport, downloadTemplate,
+    openExport, closeExport, doExport, openPrice,
   }
 }

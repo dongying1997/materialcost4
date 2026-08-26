@@ -1,18 +1,20 @@
 import { Button, Input, Upload } from 'antd'
 import {
-  PlusOutlined, SearchOutlined, UploadOutlined, DownloadOutlined,
+  PlusOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, ExportOutlined,
 } from '@ant-design/icons'
 
 interface Props {
   importing: boolean
+  exporting: boolean
   onSearch: (kw: string) => void
   onCreate: () => void
   onImport: (file: File) => Promise<boolean>
   onDownloadTemplate: () => void
+  onExport: () => void
 }
 
-/** 物料库工具栏：搜索框 + 新增 + Excel 导入 + 下载模板 */
-function MaterialsToolbar({ importing, onSearch, onCreate, onImport, onDownloadTemplate }: Props) {
+/** 物料库工具栏：搜索框 + 新增 + Excel 导入 / 导出 + 下载模板 */
+function MaterialsToolbar({ importing, exporting, onSearch, onCreate, onImport, onDownloadTemplate, onExport }: Props) {
   return (
     <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       <Input.Search
@@ -30,6 +32,7 @@ function MaterialsToolbar({ importing, onSearch, onCreate, onImport, onDownloadT
       >
         <Button icon={<UploadOutlined />} loading={importing}>Excel 导入</Button>
       </Upload>
+      <Button icon={<ExportOutlined />} loading={exporting} onClick={onExport}>导出物料</Button>
       <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>下载模板</Button>
     </div>
   )

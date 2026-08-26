@@ -8,6 +8,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"materialcost4/internal/db"
+	"materialcost4/internal/models"
 )
 
 func TestExcelImport(t *testing.T) {
@@ -151,6 +152,80 @@ func TestTemplateDownload(t *testing.T) {
 	}
 	if rows[0][1] != "CAS号" {
 		t.Errorf("template header = %v", rows[0])
+	}
+}
+
+func TestExportMaterials(t *testing.T) {
+	d := newTestDB(t)
+	repo := db.NewMaterialRepo(d)
+	svc := NewExcelService(repo)
+
+	// 插入物料与价格（苯：两条价格；乙醇：无价格）
+	m1 := &models.Material{Name: "苯", CAS: "71-43-2", Formula: "C6H6", MolWeight: 78.11, Content: 99.8}
+	id1, err := repo.Insert(m1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 8.5, Unit: "元/kg", Supplier: "S公司", Date: time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 9.0, Unit: "元/kg", Supplier: "T公司", Date: time.Date(2026, 8, 20, 0, 0, 0, 0, time.Local)}); err != nil {
+		t.Fatal(err)
+	}
+	m2 := &models.Material{Name: "乙醇", CAS: "64-17-5", Formula: "C2H6O", MolWeight: 46.07}
+	if _, err := repo.Insert(m2); err != nil {
+		t.Fatal(err)
+	}
+
+	// ---- 最新价格模式 ----
+	data, err := svc.ExportMaterials(false)
+	if err != nil {
+		t.Fatalf("export latest: %v", err)
+	}
+	f, _ := excelize.OpenReader(bytesReader(data))
+	rows, _ := f.GetRows("Sheet1")
+	if len(rows) != 3 {
+		t.Fatalf("latest rows = %d, want 3 (header + 苯 + 乙醇)", len(rows))
+	}
+	// 表头与导入模板一致
+	for i, h := range templateHeaders {
+		if rows[0][i] != h {
+			t.Errorf("export header[%d] = %q, want %q (与导入模板一致)", i, rows[0][i], h)
+		}
+	}
+	// 行序按名称排序：乙醇 在 苯 之前
+	if rows[1][0] != "乙醇" || rows[2][0] != "苯" {
+		t.Fatalf("latest row order: %v / %v", rows[1], rows[2])
+	}
+	// 乙醇（无价格）：价格列为空（GetRows 会裁剪尾部空单元格，需判长度）
+	if rows[1][1] != "64-17-5" || (len(rows[1]) > 4 && rows[1][4] != "") {
+		t.Errorf("乙醇 row = %v", rows[1])
+	}
+	// 苯（最新价 8.5，2026-08-25 最新）
+	if rows[2][4] != "8.5" || rows[2][7] != "2026-08-25" || rows[2][6] != "S公司" {
+		t.Errorf("苯 latest row = %v", rows[2])
+	}
+
+	// ---- 全部价格模式 ----
+	data2, err := svc.ExportMaterials(true)
+	if err != nil {
+		t.Fatalf("export all: %v", err)
+	}
+	f2, _ := excelize.OpenReader(bytesReader(data2))
+	rows2, _ := f2.GetRows("Sheet1")
+	// 表头 + 乙醇(1行) + 苯(2条价格) = 4 行
+	if len(rows2) != 4 {
+		t.Fatalf("all rows = %d, want 4 (header + 乙醇 + 苯×2条价格)", len(rows2))
+	}
+	// 苯的两条价格都在
+	benzRows := 0
+	for _, r := range rows2 {
+		if r[0] == "苯" {
+			benzRows++
+		}
+	}
+	if benzRows != 2 {
+		t.Errorf("苯 all rows = %d, want 2", benzRows)
 	}
 }
 

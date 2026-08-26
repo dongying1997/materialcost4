@@ -134,6 +134,115 @@ func (s *ExcelService) DownloadTemplateToFile() (string, error) {
 	return path, nil
 }
 
+// exportHeaders 物料导出表头：与导入模板 templateHeaders 保持一致，保证可回导。
+var exportHeaders = templateHeaders
+
+// ExportMaterials 导出全部物料为 xlsx 字节。
+// allPrices 为 false 时每物料一行（当前最新价格）；true 时每条价格记录一行（物料字段重复，无价格物料也出一行）。
+func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
+	list, err := s.repo.ListWithPrice("")
+	if err != nil {
+		return nil, err
+	}
+	f := excelize.NewFile()
+	sheet := f.GetSheetName(0)
+	headers := make([]any, len(exportHeaders))
+	for i, h := range exportHeaders {
+		headers[i] = h
+	}
+	_ = f.SetSheetRow(sheet, "A1", &headers)
+
+	row := 2
+	for _, m := range list {
+		// 价格记录：最新模式取单条，全部模式取所有（降序）
+		type priceRow struct {
+			price, unit, supplier, spec string
+			date                         string
+			content                      float64
+		}
+		var prices []priceRow
+		if allPrices {
+			ps, err := s.repo.ListPrices(m.ID, "")
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range ps {
+				prices = append(prices, priceRow{
+					price: fmt.Sprintf("%g", p.Price), unit: p.Unit, supplier: p.Supplier,
+					spec: p.Spec, date: p.Date.Format("2006-01-02"), content: p.Content,
+				})
+			}
+		} else if m.PriceCount > 0 {
+			prices = append(prices, priceRow{
+				price: fmt.Sprintf("%g", m.Price), unit: m.PriceUnit, supplier: m.Supplier,
+				date: m.PriceDate, content: m.Content,
+			})
+		}
+
+		if len(prices) == 0 {
+			// 无价格：仍输出一行物料，价格列为空
+			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), "", "", "", "", "", numOrEmpty(m.Content), m.Note})
+			row++
+			continue
+		}
+		for _, p := range prices {
+			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), p.price, p.unit, p.supplier, p.date, p.spec, numOrEmpty(p.content), m.Note})
+			row++
+		}
+	}
+
+	// 列宽
+	_ = f.SetColWidth(sheet, "A", "K", 18)
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ExportMaterialsToFile 导出全部物料，弹出保存对话框并写入文件。
+// allPrices 为 false 时导出最新价格，true 时导出所有价格（多条时每价格一行）。
+// 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
+// 返回保存的文件路径（用户取消时为空字符串）。
+func (s *ExcelService) ExportMaterialsToFile(allPrices bool) (string, error) {
+	data, err := s.ExportMaterials(allPrices)
+	if err != nil {
+		return "", fmt.Errorf("生成导出文件失败：%w", err)
+	}
+	app := application.Get()
+	if app == nil {
+		return "", fmt.Errorf("应用未就绪")
+	}
+	filename := "物料清单.xlsx"
+	if allPrices {
+		filename = "物料清单-全部价格.xlsx"
+	}
+	path, err := app.Dialog.SaveFile().SetFilename(filename).
+		AddFilter("Excel 文件", "*.xlsx").
+		PromptForSingleSelection()
+	if err != nil {
+		return "", err
+	}
+	if path == "" {
+		return "", nil // 用户取消
+	}
+	if filepath.Ext(path) == "" {
+		path += ".xlsx"
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return "", fmt.Errorf("写入文件失败：%w", err)
+	}
+	return path, nil
+}
+
+// numOrEmpty 将 0 值数字转为空字符串（导出更清爽）。
+func numOrEmpty(v float64) any {
+	if v == 0 {
+		return ""
+	}
+	return v
+}
+
 // ImportFromBytes 解析 Excel 并导入物料与价格。
 func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportResult, error) {
 	f, err := excelize.OpenReader(bytes.NewReader(data))
