@@ -21,7 +21,6 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
     { title: 'CAS', dataIndex: 'cas', width: 130, render: v => v || '-' },
     { title: '化学式', dataIndex: 'formula', width: 90, render: v => v || '-' },
     { title: '分子量', dataIndex: 'molWeight', width: 80, align: 'right', render: v => v || '-' },
-    { title: '回收率%', dataIndex: 'recoveryRate', width: 80, align: 'right', render: v => (v ? `${v}%` : '-') },
     {
       title: '当前价格', width: 140, align: 'right',
       render: (_, r) => r.priceCount ? (
