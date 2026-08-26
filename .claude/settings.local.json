@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version *)",
+      "Bash(wails3 version *)",
+      "Bash(npm run *)",
+      "Bash(mv /tmp/tt_test.go /tmp/ttcheck.go)",
+      "Read(//private/tmp/**)",
+      "Bash(go run *)",
+      "Bash(go build *)",
+      "Bash(go vet *)",
+      "Bash(go test *)"
+    ]
+  }
+}
