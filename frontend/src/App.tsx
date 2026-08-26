@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom'
+import { HashRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import { ConfigProvider, Layout, Menu } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import {
@@ -58,14 +58,15 @@ function App() {
           }}>
             <div style={{
               fontSize: 18, fontWeight: 600, color: '#1677ff',
-              marginRight: 32, whiteSpace: 'nowrap',
+              marginRight: 32, whiteSpace: 'nowrap',width: 50
             }}>
-              物料成本计算
+              
             </div>
             <NavMenu />
           </Header>
           <Content style={{ padding: 16, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <Routes>
+              <Route path="/" element={<Navigate to="/materials" replace />} />
               <Route path="/materials" element={<MaterialsPage />} />
               <Route path="/reaction/schemes" element={<SchemesPage />} />
               <Route path="/reaction" element={<ReactionPage />} />
