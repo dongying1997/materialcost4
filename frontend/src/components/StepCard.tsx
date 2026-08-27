@@ -52,15 +52,21 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
   }
   const addInherited = () => {
     const key = `r${Math.random().toString(36).slice(2)}`
-    onChange({
-      ...step,
-      reagents: [...step.reagents, {
-        _key: key, materialId: 0, inherited: true, name: prevProduct?.name || '（继承上一步产物）',
-        cas: '', formula: '', molWeight: prevProduct?.molWeight || 0,
-        content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
-        equiv: null, amountKg: null, unitPriceYuanPerKg: null, priceSourceId: 0, priceOptions: [],
-      }],
-    })
+    const inheritedRow: ReagentRow = {
+      _key: key, materialId: 0, inherited: true, name: prevProduct?.name || '（继承上一步产物）',
+      cas: '', formula: '', molWeight: prevProduct?.molWeight || 0,
+      content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
+      equiv: null, amountKg: null, unitPriceYuanPerKg: null, priceSourceId: 0, priceOptions: [],
+    }
+    const reagents = [...step.reagents]
+    const last = reagents[reagents.length - 1]
+    // 最后一行是空白行（未选物料/未填数据）时直接替代，避免残留空白行
+    if (last && !last.inherited && !last.materialId && !last.name && !last.equiv && !last.amountKg) {
+      reagents[reagents.length - 1] = { ...last, ...inheritedRow, _key: last._key, isSubstrate: last.isSubstrate }
+    } else {
+      reagents.push(inheritedRow)
+    }
+    onChange({ ...step, reagents })
   }
   // const addProduct = () => {
   //   onChange({
