@@ -2,6 +2,7 @@
     "conventionalCommits.scopes": [
         "all",
         "物料库",
-        "方案管理"
+        "方案管理",
+        "反应计算"
     ]
 }

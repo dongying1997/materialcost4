@@ -109,6 +109,34 @@ export function backfillFromResult(steps: StepRow[], result: MultiStepResult | n
   return anyChanged ? out : steps
 }
 
+/**
+ * 各步骤的链式成本占比乘数（传递模型）。
+ * 每步的“基础物料”= 继承自上一步的原料（承载上一步累计成本，引擎结果与输入顺序一致，用输入 steps 的 inherited 标志定位索引）。
+ * baseShare_j = 第 j 步基础物料成本 ÷ 第 j 步总成本。
+ * 某步原料在总成本中的占比 = 本步占比 × 后续每步 baseShare 之积（链式相乘）。
+ * 返回与 steps 等长的数组；某步不可乘（无继承原料/无成本/有阻塞）时其乘数为 1，后续不再传递。
+ * 例如三步反应：第 2 步物料占比 = 本步占比 × baseShare₃；第 1 步 = 本步占比 × baseShare₂ × baseShare₃。
+ */
+export function chainMultipliers(steps: StepRow[], result: MultiStepResult | null | undefined): number[] {
+  const stepResults = result?.steps || []
+  const multipliers = new Array<number>(steps.length).fill(1)
+  let acc = 1
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const sr = stepResults[i]
+    if (!sr || (sr.blockingErrors || []).length > 0 || sr.totalCost <= 0) { acc = 1; continue }
+    multipliers[i] = acc
+    // 基础物料 = 本步中继承自上一步的原料（成本承载上一步累计成本）
+    const baseIdx = steps[i]?.reagents.findIndex(r => r.inherited)
+    const base = baseIdx != null && baseIdx >= 0 ? sr.reagents?.[baseIdx] : undefined
+    if (base && base.cost > 0) {
+      acc *= base.cost / sr.totalCost
+    } else {
+      acc = 1
+    }
+  }
+  return multipliers
+}
+
 /** 收集所有非阻塞警告 */
 export function allWarningsOf(result: MultiStepResult | null): string[] {
   return (result?.steps || []).flatMap(s => s?.warnings || [])

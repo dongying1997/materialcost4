@@ -7,6 +7,7 @@ import StepCard from '../components/StepCard'
 import CalcToolbar from '../components/CalcToolbar'
 import CalcAlerts from '../components/CalcAlerts'
 import SchemeModals from '../components/SchemeModals'
+import { chainMultipliers } from '../utils/reaction'
 import type { StepRow, StepResult } from '../types'
 
 /** 反应计算编辑器页 */
@@ -19,6 +20,9 @@ function ReactionPage() {
   const [loadOpen, setLoadOpen] = useState(false)
 
   const calc = useReactionCalc(messageApi)
+
+  // 每步成本在总成本中的链式乘数（供卡片展示原料占总成本比例）
+  const multipliers = chainMultipliers(calc.steps, calc.result)
 
   // 从方案管理页载入步骤（经路由 state 传入），注入后清除 state 防止重放
   useEffect(() => {
@@ -63,6 +67,7 @@ function ReactionPage() {
             step={s}
             materials={calc.materials}
             result={(calc.result?.steps || [])[i] as StepResult | undefined}
+            totalShareMultiplier={multipliers[i]}
             prevProduct={i > 0 ? (calc.result?.steps || [])[i - 1]?.primaryProduct || null : null}
             canInherit={i > 0}
             onChange={(ns) => calc.updateStep(i, ns)}
