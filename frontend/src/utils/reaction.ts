@@ -61,6 +61,54 @@ export function stepsFromScheme(steps: ReactionStep[] | null | undefined): StepR
   }))
 }
 
+/** 四舍五入到两位小数 */
+export function round2(v: number): number {
+  return Math.round(v * 100) / 100
+}
+
+/**
+ * 把计算结果回填到编辑行中的空缺字段（仅当整条链无阻塞错误时调用）。
+ * 原料：缺实际投料量 → 用推算值；产物：缺收率/实际产量 → 用推算值。
+ * 回填值统一修约到两位小数。返回新的步骤数组；若无任何空缺则原样返回。
+ */
+export function backfillFromResult(steps: StepRow[], result: MultiStepResult | null | undefined): StepRow[] {
+  if (!result?.steps) return steps
+  const stepResults = result.steps
+  let anyChanged = false
+  const out = steps.map((s, i) => {
+    const sr = stepResults[i]
+    if (!sr || (sr.blockingErrors || []).length > 0) return s
+    let changed = false
+
+    // 原料：补投料量（当量推算值）
+    const reagents = s.reagents.map((r, j) => {
+      if (r.inherited || r.amountKg !== null && r.amountKg !== undefined && r.amountKg !== 0) return r
+      const akg = sr.reagents?.[j]?.actualAmountKg
+      if (akg && akg > 0) { changed = true; return { ...r, amountKg: round2(akg) } }
+      return r
+    })
+
+    // 产物：补空缺的收率 / 实际产量（推算值）
+    const products = s.products.map((p, j) => {
+      const pr = sr.products?.[j]
+      if (!pr) return p
+      const hasWeight = p.weightYield !== null && p.weightYield !== undefined && p.weightYield !== 0
+      const hasMolar = p.molarYield !== null && p.molarYield !== undefined && p.molarYield !== 0
+      const hasActual = p.actualYield !== null && p.actualYield !== undefined && p.actualYield !== 0
+      if (hasWeight && hasMolar && hasActual) return p
+      let np = p
+      if (!hasWeight && pr.weightYield > 0) { np = { ...np, weightYield: round2(pr.weightYield) }; changed = true }
+      if (!hasMolar && pr.molarYield > 0) { np = { ...np, molarYield: round2(pr.molarYield) }; changed = true }
+      if (!hasActual && pr.actualYieldKg > 0) { np = { ...np, actualYield: round2(pr.actualYieldKg) }; changed = true }
+      return np
+    })
+
+    if (changed) { anyChanged = true; return { ...s, reagents, products } }
+    return s
+  })
+  return anyChanged ? out : steps
+}
+
 /** 收集所有非阻塞警告 */
 export function allWarningsOf(result: MultiStepResult | null): string[] {
   return (result?.steps || []).flatMap(s => s?.warnings || [])

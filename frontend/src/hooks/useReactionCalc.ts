@@ -5,7 +5,7 @@ import { MaterialService, ReactionService } from '../bindings'
 import type {
   MaterialWithPrice, StepRow, MultiStepResult, MaterialPriceOption,
 } from '../types'
-import { newStep, stepsToPayload } from '../utils/reaction'
+import { newStep, stepsToPayload, backfillFromResult } from '../utils/reaction'
 import { usePersistedState } from './useStorage'
 
 const STORAGE_KEY = 'materialcost4:reaction-steps'
@@ -115,9 +115,25 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     })))
   }
 
+  // 重新计算按钮：计算结果后回填空缺字段
+  const recalculate = async () => {
+    setCalculating(true)
+    try {
+      const r = await ReactionService.Calculate({ steps: stepsToPayload(steps) })
+      setResult(r as MultiStepResult)
+      // 数据无误时补全空缺数据（回填为推算值）
+      const filled = backfillFromResult(steps, r as MultiStepResult)
+      if (filled !== steps) setSteps(filled)
+    } catch (e) {
+      messageApi.error(String(e))
+    } finally {
+      setCalculating(false)
+    }
+  }
+
   return {
     steps, setSteps, materials, result, calculating,
     updateStep, addStep, removeStep, moveStep, clearAll,
-    recalculate: calculate, ensurePriceOptions,
+    recalculate, ensurePriceOptions,
   }
 }
