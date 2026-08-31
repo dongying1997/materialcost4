@@ -5,7 +5,28 @@ import type {
   MaterialWithPrice, StepResult, ReagentRow, ProductRow, StepRow, IntermediateProduct,
   ReagentResult, ProductResult,
 } from '../types'
-import { fmtNum } from '../utils/file'
+import { fmtNum, fmtMoney } from '../utils/file'
+
+// ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
+// 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
+// 名称区合计两表一致（原料：名称190+CAS110，产物：名称140+选物料160=300），
+// 其后分子量(第4列)、投料/实际产量kg(第8列)、成本(第10列)栅格完全重合。
+const COL_RADIO  = 46    // 底物/产物单选
+const COL_NAME_R = 190   // 原料名称（Select）
+const COL_CAS    = 110   // CAS
+const COL_NAME_P = 140   // 产物名称（Input）
+const COL_SELP   = 160   // 选物料（Select）
+const COL_NUM    = 100   // 数值输入列（分子量/含量/收率/当量/投料量等）
+const COL_RST    = 104   // 单价 / 理论产量
+const COL_COST   = 130   // 成本(元) / 单位成本(元/kg)
+const COL_DEL    = 44    // 删除按钮
+
+// 两表总宽一致；容器更宽时表格按 minWidth:100% 等比拉伸，两表始终对齐
+const TOTAL_WIDTH = COL_RADIO + COL_NAME_R + COL_CAS + COL_NUM * 5 + COL_RST + COL_COST + COL_DEL
+//                 = 46 + (190+110) + 100*5 + 104 + 130 + 44 = 1124
+
+// 输入控件铺满所在单元格
+const fullInput = { width: '100%' } as const
 
 interface Props {
   index: number
@@ -68,17 +89,6 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     }
     onChange({ ...step, reagents })
   }
-  // const addProduct = () => {
-  //   onChange({
-  //     ...step,
-  //     products: [...step.products, {
-  //       _key: `p${Math.random().toString(36).slice(2)}`,
-  //       materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
-  //       isSubstrate: step.products.length === 0, molarRatio: 1,
-  //       weightYield: null, molarYield: null, actualYield: null,
-  //     }],
-  //   })
-  // }
 
   const pickMaterial = (row: ReagentRow, materialId: number) => {
     const m = materials.find(x => x.id === materialId)
@@ -93,7 +103,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
 
   const reagentColumns: ColumnsType<ReagentRow> = [
     {
-      title: '底物', width: 40, align: 'center',
+      title: '底物', width: COL_RADIO, align: 'center',
       render: (_, r) => (
         <Tooltip title={r.isSubstrate ? '底物（1 eq 基准）' : '标记为底物'}>
           <Radio checked={r.isSubstrate} onClick={() => markSubstrate(r._key)} />
@@ -101,92 +111,103 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       ),
     },
     {
-      title: '原料名称', width: 200,
+      title: '原料名称', width: COL_NAME_R,
       render: (_, r) => r.inherited ? (
         <Space size={4}>
-          <LinkOutlined style={{ color: '#fa8c16' }} />
-          <Tag color="orange" style={{ margin: 0 }}>{r.name}</Tag>
+          <LinkOutlined style={{ color: '#fa8c16', fontSize: 12 }} />
+          <Tag color="orange" style={{
+            margin: 0, maxWidth: COL_NAME_R - 24, overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{r.name}</Tag>
         </Space>
       ) : (
         <Select
-          size="small" showSearch allowClear style={{ width: 200 }} placeholder="选择物料"
+          size="small" showSearch allowClear style={fullInput} placeholder="选择物料"
           optionFilterProp="label" value={r.materialId || undefined}
           options={materials.map(m => ({ value: m.id, label: `${m.name}${m.cas ? `（${m.cas}）` : ''}` }))}
           onChange={(v) => {
-            pickMaterial(r, v)
-            if (v) onPriceOptions?.(v, r._key)
+            if (v) { pickMaterial(r, v); onPriceOptions?.(v, r._key) }
+            else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], priceSourceId: 0 })
           }}
         />
       ),
     },
     {
-      title: 'CAS', width: 60, render: (_, r) => <span style={{ fontSize: 12 }}>{r.cas || '-'}</span>,
-    },
-    {
-      title: '分子量', width: 60, align: 'left',
-      render: (_, r) => <span>{r.molWeight ? fmtNum(r.molWeight) : '-'}</span>,
-    },
-    {
-      title: '含量%', width: 60,
+      title: 'CAS', width: COL_CAS, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={{ width: 60 }} min={0} max={100} value={r.content}
+        <span style={{ fontSize: 13, color: r.cas ? '#333' : '#bbb' }}>{r.cas || '-'}</span>
+      ),
+    },
+    {
+      title: '分子量', width: COL_NUM, align: 'center',
+      render: (_, r) => <span style={{ fontSize: 13 }}>{r.molWeight ? fmtMoney(r.molWeight) : '-'}</span>,
+    },
+    {
+      title: '含量%', width: COL_NUM, align: 'center',
+      render: (_, r) => (
+        <InputNumber size="small" style={fullInput} min={0} max={100} value={r.content}
           onChange={(v) => updateReagent(r._key, { content: v ?? 100 })} />
       ),
     },
     {
-      title: '回收率%', width: 60,
+      title: '回收率%', width: COL_NUM, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={{ width: 60 }} min={0} max={100} value={r.recoveryRate}
+        <InputNumber size="small" style={fullInput} min={0} max={100} value={r.recoveryRate}
           onChange={(v) => updateReagent(r._key, { recoveryRate: v ?? 0 })} />
       ),
     },
     {
-      title: '当量', width: 60,
-      render: (_, r) => r.inherited && r.isSubstrate ? <span style={{ color: '#999' }}>1</span> : (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.1} value={r.equiv ?? undefined}
+      title: '当量', width: COL_NUM, align: 'center',
+      render: (_, r) => r.inherited && r.isSubstrate ? (
+        <InputNumber size="small" style={fullInput} value={1} disabled />
+      ) : (
+        <InputNumber size="small" style={fullInput} min={0} step={0.1} value={r.equiv ?? undefined}
           placeholder="可空" onChange={(v) => updateReagent(r._key, { equiv: v ?? null })} />
       ),
     },
     {
-      title: '投料量 kg', width: 60,
+      title: '投料量 kg', width: COL_NUM, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.001} value={r.amountKg ?? undefined}
+        <InputNumber size="small" style={fullInput} min={0} step={0.001} value={r.amountKg ?? undefined}
           placeholder="可空" onChange={(v) => updateReagent(r._key, { amountKg: v ?? null })} />
       ),
     },
     {
-      title: '单价 元/kg', width: 60,
+      title: '单价 元/kg', width: COL_RST, align: 'center',
       render: (_, r) => {
+        const idx = step.reagents.indexOf(r)
         if (r.inherited) {
-          const up = rr(step.reagents.indexOf(r))?.unitPrice
-          return <span style={{ color: '#fa8c16' }}>{up ? fmtNum(up) : '（继承）'}</span>
+          const up = rr(idx)?.unitPrice
+          return <span style={{ color: '#fa8c16', fontWeight: 500, fontSize: 13 }}>{up ? fmtMoney(up) : '（继承）'}</span>
         }
         const opts = r.priceOptions || []
         if (opts.length > 1) {
           return (
-            <Select size="small" style={{ width: '100%' }} value={r.priceSourceId || 0}
+            <Select size="small" style={fullInput} value={r.priceSourceId || 0}
+              popupMatchSelectWidth={false}
               options={opts.map(o => ({ value: o.priceId, label: `${o.date} ${o.price}${o.unit} ${o.spec} ${o.supplier}` }))}
               onChange={(v) => updateReagent(r._key, { priceSourceId: v || 0 })}
             />
           )
         }
-        const up = rr(step.reagents.indexOf(r))?.unitPrice
-        return <span style={{ fontSize: 12 }}>{up ? fmtNum(up) : <span style={{ color: '#bbb' }}>自动</span>}</span>
+        const up = rr(idx)?.unitPrice
+        return <span style={{ fontSize: 13, color: up ? '#333' : '#bbb' }}>{up ? fmtMoney(up) : '自动'}</span>
       },
     },
     {
-      title: '成本(元)', width: 90, align: 'right',
+      title: '成本(元)', width: COL_COST, align: 'right',
       render: (_, r) => {
-        const c = rr(step.reagents.indexOf(r))?.cost
-        const warn = rr(step.reagents.indexOf(r))?.warnings?.length
-        if (!c) return <span>-</span>
+        const idx = step.reagents.indexOf(r)
+        const c = rr(idx)?.cost
+        const warn = rr(idx)?.warnings?.length
+        if (!c) return <span style={{ color: '#bbb' }}>-</span>
         const stepPct = result && result.totalCost > 0 ? (c / result.totalCost * 100) : 0
         // 占总成本比例：本步占比 × 链式乘数（承载前续步骤成本）
         const totalPct = stepPct * totalShareMultiplier
         const isLastChain = result && result.totalCost > 0 && Math.abs(totalShareMultiplier - 1) < 1e-9
         return (
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ color: warn ? '#faad14' : undefined }}>{fmtNum(c, 2)}</div>
+          <div style={{ textAlign: 'right', lineHeight: 1.35 }}>
+            <div style={{ color: warn ? '#faad14' : '#333', fontWeight: 500 }}>{fmtMoney(c)}</div>
             {result && result.totalCost > 0 && (
               isLastChain ? (
                 <Tooltip title="占本步成本比例">
@@ -195,9 +216,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
               ) : (
                 <Tooltip title="本步占比 / 占总成本占比">
                   <div style={{ fontSize: 11, color: '#999' }}>
-                    <span style={{ color: '#999' }}>{fmtNum(stepPct, 1)}%</span>
-                    <span style={{ color: '#bbb' }}> / </span>
-                    <span style={{ color: '#1677ff' }}>{fmtNum(totalPct, 1)}%</span>
+                    {fmtNum(stepPct, 1)}% <span style={{ color: '#ccc' }}>/</span> <span style={{ color: '#1677ff' }}>{fmtNum(totalPct, 1)}%</span>
                   </div>
                 </Tooltip>
               )
@@ -207,7 +226,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       },
     },
     {
-      title: '', width: 40,
+      title: '', width: COL_DEL, align: 'center',
       render: (_, r) => (
         <Button size="small" type="text" danger icon={<DeleteOutlined />}
           disabled={step.reagents.length <= 1}
@@ -218,7 +237,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
 
   const productColumns: ColumnsType<ProductRow> = [
     {
-      title: '产物', width: 40, align: 'center',
+      title: '产物', width: COL_RADIO, align: 'center',
       render: (_, p) => (
         <Tooltip title={p.isSubstrate ? '主产物（供下一步继承）' : '标记为主产物'}>
           <Radio checked={p.isSubstrate} onClick={() => markPrimary(p._key)} />
@@ -226,16 +245,16 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       ),
     },
     {
-      title: '产物名称', width: 100,
+      title: '产物名称', width: COL_NAME_P,
       render: (_, p) => (
-        <Input size="small" value={p.name} placeholder="手动输入产物名称"
+        <Input size="small" style={fullInput} value={p.name} placeholder="产物名称"
           onChange={(e) => updateProduct(p._key, { name: e.target.value })} />
       ),
     },
     {
-      title: '选物料', width: 100,
+      title: '选物料', width: COL_SELP,
       render: (_, p) => (
-        <Select size="small" showSearch allowClear style={{ width: '100%' }} placeholder="从物料库选"
+        <Select size="small" showSearch allowClear style={fullInput} placeholder="从物料库选"
           optionFilterProp="label" value={p.materialId || undefined}
           options={materials.map(m => ({ value: m.id, label: m.name }))}
           onChange={(v) => {
@@ -247,54 +266,50 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       ),
     },
     {
-      title: '分子量', width: 60,
+      title: '分子量', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} value={p.molWeight || undefined}
+        <InputNumber size="small" style={fullInput} min={0} value={p.molWeight || undefined}
           placeholder="必填" onChange={(v) => updateProduct(p._key, { molWeight: v ?? 0 })} />
       ),
     },
     {
-      title: '计量数', width: 60,
+      title: '计量数', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.1} value={p.molarRatio || undefined}
+        <InputNumber size="small" style={fullInput} min={0} step={0.1} value={p.molarRatio || undefined}
           onChange={(v) => updateProduct(p._key, { molarRatio: v ?? 1 })} />
       ),
     },
     {
-      title: '重量收率%', width: 60,
+      title: '重量收率%', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} max={200} value={p.weightYield ?? undefined}
+        <InputNumber size="small" style={fullInput} min={0} max={200} value={p.weightYield ?? undefined}
           placeholder="可空" onChange={(v) => updateProduct(p._key, { weightYield: v ?? null })} />
       ),
     },
     {
-      title: '摩尔收率%', width: 60,
+      title: '摩尔收率%', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} max={200} value={p.molarYield ?? undefined}
+        <InputNumber size="small" style={fullInput} min={0} max={200} value={p.molarYield ?? undefined}
           placeholder="可空" onChange={(v) => updateProduct(p._key, { molarYield: v ?? null })} />
       ),
     },
     {
-      title: '实际产量 kg', width: 60,
+      title: '实际产量 kg', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.001} value={p.actualYield ?? undefined}
+        <InputNumber size="small" style={fullInput} min={0} step={0.001} value={p.actualYield ?? undefined}
           placeholder="可空" onChange={(v) => updateProduct(p._key, { actualYield: v ?? null })} />
       ),
     },
     {
-      title: '理论产量', width: 60, align: 'right',
-      render: (_, p) => { const x = pr(step.products.indexOf(p))?.theoreticalYieldKg; return <span>{x ? fmtNum(x) : '-'}</span> },
+      title: '理论产量 kg', width: COL_RST, align: 'center',
+      render: (_, p) => { const x = pr(step.products.indexOf(p))?.theoreticalYieldKg; return <span style={{ fontSize: 13 }}>{x ? fmtMoney(x) : '-'}</span> },
     },
     {
-      title: '推算产量', width: 60, align: 'right',
-      render: (_, p) => { const x = pr(step.products.indexOf(p))?.actualYieldKg; return <span>{x ? fmtNum(x) : '-'}</span> },
+      title: '单位成本(元/kg)', width: COL_COST, align: 'right',
+      render: (_, p) => { const x = pr(step.products.indexOf(p))?.unitCost; return <span style={{ fontSize: 13, fontWeight: 500 }}>{x ? fmtMoney(x) : '-'}</span> },
     },
     {
-      title: '单位成本(元/kg)', width: 60, align: 'right',
-      render: (_, p) => { const x = pr(step.products.indexOf(p))?.unitCost; return <span>{x ? fmtNum(x, 2) : '-'}</span> },
-    },
-    {
-      title: '', width: 40,
+      title: '', width: COL_DEL, align: 'center',
       render: (_, p) => (
         <Button size="small" type="text" danger icon={<DeleteOutlined />}
           disabled={step.products.length <= 1}
@@ -307,14 +322,22 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
   const hasBlocking = !!result && (result.blockingErrors || []).length > 0
   const warnings = result?.warnings || []
 
+  // 公共 Table 属性：两表字号、行高、总宽完全一致
+  const tableProps = {
+    size: 'small' as const,
+    rowKey: '_key' as const,
+    pagination: false as const,
+    style: { marginBottom: 0 },
+  }
+
   return (
     <Card
       size="small"
-      style={{ marginBottom: 16 }}
-      styles={{ body: { paddingTop: 8 } }}
+      style={{ marginBottom: 12 }}
+      styles={{ body: { padding: '8px 12px 10px' } }}
       title={
-        <Space>
-          <span style={{ fontWeight: 600 }}>步骤 {index + 1}</span>
+        <Space size={8}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>步骤 {index + 1}</span>
           <Input size="small" style={{ width: 180 }} value={step.name} placeholder="步骤名称（可选）"
             onChange={(e) => onChange({ ...step, name: e.target.value })} />
         </Space>
@@ -327,8 +350,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
         </Space>
       }
     >
-      <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Space>
+      <div style={{ marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Space size={6}>
           <span style={{ color: '#666', fontSize: 13 }}>原料</span>
           <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addReagent}>添加原料</Button>
           {canInherit && !inheritedExists && (
@@ -339,25 +362,20 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
         </Space>
         <Space size={12}>
           <span style={{ fontSize: 13 }}>本步总成本：
-            <b style={{ color: '#1677ff' }}>{result ? fmtNum(result.totalCost, 2) : '-'} 元</b>
+            <b style={{ color: '#1677ff', marginLeft: 4 }}>{result ? fmtMoney(result.totalCost) : '-'} 元</b>
           </span>
-          {result && <span style={{ fontSize: 12, color: '#999' }}>底物摩尔数 {fmtNum(result.substrateMoles)} mol</span>}
+          {result && <span style={{ fontSize: 12, color: '#999' }}>底物摩尔数 {fmtMoney(result.substrateMoles)} mol</span>}
         </Space>
       </div>
 
-      <Table size="small" rowKey="_key" dataSource={step.reagents} columns={reagentColumns}
-        pagination={false} scroll={{ x: 1150 }}
+      <Table {...tableProps} dataSource={step.reagents} columns={reagentColumns}
+        scroll={{ x: TOTAL_WIDTH }}
+        onRow={(r) => (r.inherited ? { style: { background: '#fff7e6' } } : {})}
         locale={{ emptyText: '暂无原料' }} />
 
-      {/* <div style={{ margin: '12px 0 8px' }}>
-        <Space>
-          <span style={{ color: '#666', fontSize: 13 }}>产物</span>
-          <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={addProduct}>添加产物</Button>
-        </Space>
-      </div> */}
-
-      <Table size="small" rowKey="_key" dataSource={step.products} columns={productColumns}
-        pagination={false} scroll={{ x: 1250 }}
+      <Table {...tableProps} dataSource={step.products} columns={productColumns}
+        scroll={{ x: TOTAL_WIDTH }}
+        style={{ marginTop: 10, marginBottom: 0 }}
         locale={{ emptyText: '暂无产物' }} />
 
       {hasBlocking && (
