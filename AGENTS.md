@@ -32,11 +32,15 @@ Wails v3 desktop app — Go backend + React/TypeScript frontend for chemical mat
 | `go test ./...` | Run all backend unit tests |
 | `cd frontend && npm run build` | Frontend-only production build |
 
+**Ordering constraint**: `main.go` embeds the frontend with `//go:embed all:frontend/dist`, and `frontend/dist` is gitignored — absent in a fresh clone. **Build the frontend before running any Go command on the root package** (`go build` / `go vet` / `go test` all fail with `pattern all:frontend/dist: no matching files found` otherwise). This is why CI runs the frontend steps first.
+
+`build/` holds per-platform Wails scaffolding with build tags (`//go:build ios`, etc.). It is gitignored and absent in CI; locally, `go build ./...` may report `function main is undeclared` from `build/ios/`. Scope Go commands to `./internal/... .` to avoid it.
+
 ## Coding Style & Naming Conventions
 
 - **Go**: Use `gofmt` (tabs for indentation). Run `go fmt ./...` before committing. Exported names: `PascalCase`; unexported: `camelCase`. Group imports: stdlib → third-party → local.
 - **TypeScript/React**: Strict mode enabled. Components: `PascalCase.tsx`; hooks: `useXxx.ts`. Use double quotes.
-- **UI**: Prefer Ant Design components over hand-rolled ones; use Tailwind utilities for layout.
+- **UI**: Prefer Ant Design components over hand-rolled ones; use its layout primitives (`Flex`/`Space`/`Row`/`Col`) for spacing. Tailwind is not installed in this project.
 - **Comments**: Inline comments may be in Chinese (consistent with the codebase).
 
 ## Testing Guidelines
