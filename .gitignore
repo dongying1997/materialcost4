@@ -1,11 +1,19 @@
+.task/
 .task
 bin
 frontend/dist
 frontend/node_modules
-build/
+
+# build/ 是构建脚手架：各平台 Taskfile、图标、Info.plist、打包配置
+# （NSIS / nfpm / msix）以及 docker 交叉编译镜像定义，全部必须入库，
+# 否则全新克隆无法执行 `wails3 build` / `wails3 package`。
+!build/
+
+# 构建产物与按机器生成的中间文件
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
-# Mobile generated (per-machine; overlays hold absolute paths)
+build/linux/*.desktop
+# 移动端工程按机器生成（overlay 内含绝对路径）
 build/ios/xcode/overlay.json
 build/ios/xcode/gen/
 build/android/overlay.json
@@ -14,6 +22,9 @@ build/android/gen/
 *.xml
 *.DS_Store
 *.iml
+
+# MSIX 打包需要这两个清单文件，勿被上面的 *.xml 规则吞掉
+!build/windows/msix/*.xml
 
 # IDE
 /.idea/

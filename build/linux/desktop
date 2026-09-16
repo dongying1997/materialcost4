@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=MaterialCost
+Comment=化学反应的物料成本计算工具
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/materialcost4 %u
+Terminal=false
+Type=Application
+Icon=materialcost4
+Categories=Utility;
+StartupWMClass=materialcost4
+
+ 

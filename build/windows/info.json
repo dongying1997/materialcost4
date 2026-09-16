@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "dongying1997",
+			"FileDescription": "化学反应的物料成本计算工具",
+			"LegalCopyright": "(c) 2026, dongying1997",
+			"ProductName": "MaterialCost",
+			"Comments": "基于 Wails v3 + React 的化学物料成本计算桌面应用"
+		}
+	}
+}
