@@ -64,8 +64,6 @@ jobs:
       - name: 下载 Go 依赖
         run: go mod download
 
-      # 只检查 internal/ 与根包：build/ 下是各平台的 Wails 打包脚手架，
-      # 带 //go:build ios 等标签，本地存在但被 .gitignore 忽略，CI 中不参与构建。
       - name: go vet
         run: go vet ./internal/... .
 

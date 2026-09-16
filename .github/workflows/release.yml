@@ -1,0 +1,211 @@
+name: Release
+
+# 打 tag（如 v0.1.0）时触发，构建各平台安装包并发布到 GitHub Release。
+#
+# 版本号来源：build/config.yml 的 info.version。它会被写入 macOS 的
+# Info.plist、Windows 的 info.json 与 Linux 的 nfpm.yaml，因此升级版本时
+# 需同步修改该文件（tag 名与之一致，如 v0.1.0）。
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # 创建 Release 并上传产物
+
+jobs:
+  # macOS：在 Apple 芯片 runner 上构建 arm64 + amd64 通用二进制，产出 .dmg
+  # 不签名公证：未持有 Apple Developer 证书，用户首次打开需右键「打开」。
+  macos:
+    name: macOS (.dmg)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # wails3 build / package 依赖 Taskfile；wails3 task 会委托给 PATH 上的
+      # task 二进制，因此各平台都必须安装 Task 运行器。
+      - name: 安装 Task
+        uses: arduino/setup-task@v3
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
+
+      - name: 构建通用二进制并打包为 dmg
+        run: wails3 task darwin:package:dmg
+
+      - name: 生成校验和
+        run: shasum -a 256 bin/*.dmg > bin/checksums-macos.txt && cat bin/checksums-macos.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: |
+            bin/*.dmg
+            bin/checksums-macos.txt
+
+  # Windows：原生构建 exe 并用 NSIS 打出安装程序
+  windows:
+    name: Windows (installer)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装 Task
+        uses: arduino/setup-task@v3
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
+
+      - name: 安装 NSIS
+        run: choco install nsis --yes
+
+      - name: 构建并打包为安装程序
+        run: wails3 task windows:package
+
+      - name: 生成校验和
+        shell: pwsh
+        run: |
+          Get-ChildItem bin\*.exe | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Out-File -Encoding utf8 bin\checksums-windows.txt
+          Get-Content bin\checksums-windows.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            bin/*.exe
+            bin/checksums-windows.txt
+
+  # Linux：在目标发行版上原生构建（CGO 需要 GTK4 / WebKitGTK），
+  # 用 nfpm 打包 .deb 与 .rpm。Ubuntu 24.04 提供 GTK 4.14.5，
+  # 满足 Wails Linux 后端 GTK >= 4.14 的要求。
+  linux-x64:
+    name: Linux x64 (deb / rpm)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装 Task
+        uses: arduino/setup-task@v3
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
+
+      - name: 安装构建与打包依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config gcc libc6-dev \
+            libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libgtk-4-dev libwebkitgtk-6.0-dev
+          pkg-config --atleast-version=4.14 gtk4
+          pkg-config --exists webkitgtk-6.0
+
+      - name: 构建并打包 deb / rpm
+        env:
+          # nfpm.yaml 用这两个变量填 maintainer 字段，需显式提供
+          GIT_COMMITTER_NAME: dongying1997
+          GIT_COMMITTER_EMAIL: 130125674+dongying1997@users.noreply.github.com
+        run: wails3 task linux:package
+
+      - name: 生成校验和
+        run: sha256sum bin/*.deb bin/*.rpm > bin/checksums-linux-x64.txt && cat bin/checksums-linux-x64.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64-packages
+          path: |
+            bin/*.deb
+            bin/*.rpm
+            bin/checksums-linux-x64.txt
+
+  # 将各平台产物汇总到一个 Release
+  publish:
+    name: 发布 Release
+    needs: [macos, windows, linux-x64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # 统一重命名并生成一份汇总校验和。
+      # 注意本步骤在 `set -e` 下运行，且某些平台可能无产物（空 glob），
+      # 因此所有重命名都必须带 || true，否则会误判为失败。
+      - name: 整理产物并生成校验和
+        run: |
+          set -e
+          cd artifacts
+          shopt -s nullglob
+
+          # 各平台单独计算的校验和丢弃，改由最终产物统一生成
+          rm -f checksums-*.txt
+
+          # 把平台标识写进文件名，避免用户拿到一堆同名文件分不清来源
+          rename_if() { [ -f "$1" ] && mv "$1" "$2" || true; }
+          rename_if materialcost4.dmg                 materialcost4-macos-universal.dmg
+          rename_if materialcost4-amd64-installer.exe materialcost4-windows-amd64-setup.exe
+          for f in *.deb; do mv "$f" "materialcost4-linux-amd64.deb"; done
+          for f in *.rpm; do mv "$f" "materialcost4-linux-x86_64.rpm"; done
+
+          sha256sum materialcost4-* > SHA256SUMS.txt
+          ls -lh
+          cat SHA256SUMS.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          body: |
+            ## 安装说明
+
+            | 平台 | 文件 |
+            |------|------|
+            | macOS（Intel + Apple 芯片通用） | `materialcost4-macos-universal.dmg` |
+            | Windows (x64) | `materialcost4-windows-amd64-setup.exe` |
+            | Linux (Debian / Ubuntu) | `materialcost4-linux-amd64.deb` |
+            | Linux (Fedora / RHEL) | `materialcost4-linux-x86_64.rpm` |
+
+            安装包均**未做代码签名**：
+
+            - **macOS**：首次打开需右键点击应用选「打开」，或在「系统设置 → 隐私与安全性」中放行。
+            - **Windows**：SmartScreen 可能提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」。
+            - **Linux**：deb / rpm 已声明 GTK4 与 WebKitGTK 依赖，由包管理器自动安装。
+
+            校验和见 `SHA256SUMS.txt`。
+
+            > 数据存放于系统用户数据目录（macOS 为 `~/Library/Application Support/MaterialCost4/`），
+            > 升级或重装不会丢失。

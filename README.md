@@ -65,6 +65,19 @@
 
 **架构约束**：前端只做展示与输入，所有业务逻辑（计算、校验、持久化）都在 Go 后端。前端通过 Wails 自动生成的 TS 绑定调用后端服务，绑定代码位于 `frontend/bindings/`，由 `wails3 generate bindings` 生成 —— **请勿手工编辑**。
 
+## 下载安装
+
+前往 [Releases](https://github.com/dongying1997/materialcost4/releases) 下载对应平台的安装包：
+
+| 平台 | 文件 |
+|------|------|
+| macOS（Intel + Apple 芯片通用） | `materialcost4-macos-universal.dmg` |
+| Windows (x64) | `materialcost4-windows-amd64-setup.exe` |
+| Linux (Debian / Ubuntu) | `materialcost4-linux-amd64.deb` |
+| Linux (Fedora / RHEL) | `materialcost4-linux-x86_64.rpm` |
+
+安装包未做代码签名：macOS 首次打开需右键选「打开」；Windows 可能弹出 SmartScreen 提示，选「更多信息 → 仍要运行」。
+
 ## 快速开始
 
 ### 前置依赖
@@ -74,9 +87,11 @@
 | Go | 1.25+ | `brew install go` |
 | Node.js | 20+ | `brew install node` |
 | Wails CLI | v3.0.0-beta.12 | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
-| Task | 3.x | `brew install go-task`（`wails3 build` 依赖，dev 模式不需要） |
+| Task | 3.x | `brew install go-task`（`wails3 build` / `wails3 package` 依赖） |
 
 > Wails v3 目前仍是 beta，请确保 CLI 版本与 `go.mod` 中的 `v3.0.0-beta.12` 一致，否则绑定生成可能不兼容。
+>
+> 各平台的打包配置与图标（`build/`）已随仓库分发，克隆后即可直接构建，无需 `wails3 init`。
 
 ### 构建与运行
 
@@ -96,9 +111,14 @@ wails3 build
 # 4. 运行后端测试
 go test ./...
 
-# 5.（可选）修改 Go 模型或服务后，重新生成前端绑定
+# 5. 打当前平台的安装包（macOS 出 .dmg，Windows 出安装程序，Linux 出 deb/rpm）
+wails3 package
+
+# 6.（可选）修改 Go 模型或服务后，重新生成前端绑定
 wails3 generate bindings -ts -i
 ```
+
+也可以直接 `wails3 task darwin:package:dmg` 等按平台打包。发布新版本的流程见 [CONTRIBUTING.md](CONTRIBUTING.md#发布版本)。
 
 应用数据（SQLite 数据库）存放在系统用户数据目录下，不随仓库分发：
 

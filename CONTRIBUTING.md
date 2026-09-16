@@ -94,6 +94,36 @@ docs(all): 重写 README 为开源版
 
 一次提交只做一件事，不要把无关改动混在一起。
 
+## 发布版本
+
+发布由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在推送 `v*` tag 时自动完成，无需手工构建。
+
+**版本号只有一个来源：[`build/config.yml`](build/config.yml) 的 `info.version`。** 它会被写进 macOS 的 `Info.plist`、Windows 的 `info.json` 与 Linux 的 `nfpm.yaml`。修改后需同步生成物：
+
+```bash
+wails3 task common:update:build-assets
+```
+
+**发布步骤：**
+
+1. 修改 `build/config.yml` 的 `info.version`（如 `0.1.0` → `0.2.0`）并提交。
+2. 推送后打 tag，**tag 名须与版本号一致**：
+
+   ```bash
+   git tag v0.2.0 && git push origin v0.2.0
+   ```
+
+3. CI 会并行构建三个平台并汇总发布：
+   - **macOS** (`macos-14`)：arm64 + amd64 通用二进制，产出 `.dmg`
+   - **Windows** (`windows-latest`)：NSIS 安装程序 `.exe`
+   - **Linux** (`ubuntu-24.04`)：`.deb` 与 `.rpm`
+
+所有产物均**未做代码签名**（未持有 Apple Developer / Windows 代码签名证书）。Windows 上 NSIS 需要 runner 自带，由 `choco install nsis` 安装。
+
+### 为什么 Linux 必须原生构建
+
+Linux 的 Wails 后端需要 GTK4 与 WebKitGTK，且 `CGO_ENABLED=1`，无法从 macOS/Windows 简单交叉编译。因此 Linux 产物在 `ubuntu-24.04` 上原生构建 —— 该版本提供 GTK 4.14.5，满足 Wails 要求的 **GTK >= 4.14**（Debian 13 / Ubuntu 24.04 是基线，见 [`build/docker/Dockerfile.cross`](build/docker/Dockerfile.cross)）。
+
 ## 提交 Pull Request
 
 1. 从 `main` 切出特性分支。

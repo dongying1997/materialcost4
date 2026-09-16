@@ -34,7 +34,7 @@ Wails v3 desktop app — Go backend + React/TypeScript frontend for chemical mat
 
 **Ordering constraint**: `main.go` embeds the frontend with `//go:embed all:frontend/dist`, and `frontend/dist` is gitignored — absent in a fresh clone. **Build the frontend before running any Go command on the root package** (`go build` / `go vet` / `go test` all fail with `pattern all:frontend/dist: no matching files found` otherwise). This is why CI runs the frontend steps first.
 
-`build/` holds per-platform Wails scaffolding with build tags (`//go:build ios`, etc.). It is gitignored and absent in CI; locally, `go build ./...` may report `function main is undeclared` from `build/ios/`. Scope Go commands to `./internal/... .` to avoid it.
+`build/` holds per-platform Wails scaffolding — Taskfiles, icons, `Info.plist` and packaging configs (NSIS / nfpm / msix). **It is tracked** (only build outputs and per-machine generated files are gitignored), so a fresh clone can run `wails3 build` / `wails3 package` directly without `wails3 init`. Its `//go:build ios` / `android` scaffolding is excluded from ordinary builds, so `go test ./...` works locally.
 
 ## Coding Style & Naming Conventions
 
