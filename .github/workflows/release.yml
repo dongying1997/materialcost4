@@ -10,6 +10,9 @@ on:
   push:
     tags:
       - "v*"
+  # 手动触发用于验证构建链路：只构建上传 artifact，不创建 Release
+  # （发布步骤仅在 tag 触发时执行）。
+  workflow_dispatch:
 
 permissions:
   contents: write # 创建 Release 并上传产物
@@ -33,10 +36,13 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # wails3 build / package 依赖 Taskfile；wails3 task 会委托给 PATH 上的
-      # task 二进制，因此各平台都必须安装 Task 运行器。
+      # 用官方脚本安装：arduino/setup-task 会调用 GitHub API 拉取 release，
+      # 在 CI 的共享出口 IP 上会撞上速率限制（实测报 "API rate limit exceeded"）。
+      # 该脚本直接下载二进制，不经过 API。
       - name: 安装 Task
-        uses: arduino/setup-task@v3
+        run: |
+          curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
+          task --version
 
       - name: 安装 Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
@@ -71,14 +77,31 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # Windows 原生跑安装脚本需要用 PowerShell 管道；不依赖 GitHub API，
+      # 避免 arduino/setup-task 的速率限制问题。
       - name: 安装 Task
-        uses: arduino/setup-task@v3
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://taskfile.dev/install.ps1 -OutFile install-task.ps1
+          ./install-task.ps1 -BinDir "$env:USERPROFILE\bin" -Force
+          echo "$env:USERPROFILE\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          task --version
 
       - name: 安装 Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
 
+      # choco 装的 NSIS 不一定在 PATH 上（实测报
+      # "makensis: executable file not found in $PATH"），因此显式定位并加入 PATH。
       - name: 安装 NSIS
-        run: choco install nsis --yes
+        shell: pwsh
+        run: |
+          choco install nsis --yes
+          $dir = Get-ChildItem "C:\Program Files (x86)\NSIS","C:\Program Files\NSIS" -ErrorAction SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+          if (-not $dir) { throw "未找到 NSIS 安装目录" }
+          Write-Host "NSIS 目录: $dir"
+          $dir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$dir\makensis.exe" /VERSION
 
       - name: 构建并打包为安装程序
         run: wails3 task windows:package
@@ -118,11 +141,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: 安装 Task
-        uses: arduino/setup-task@v3
+        run: |
+          curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
+          task --version
 
-      - name: 安装 Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
-
+      # 系统依赖必须在安装 Wails CLI 之前装好：`go install wails3` 会编译 Wails
+      # 自身的 GTK 绑定，缺少这些库时安装阶段就会失败
+      # （实测报 /usr/bin/ld: cannot find -lgraphene-1.0 / -lsoup-3.0 / -lglib-2.0），
+      # 且失败会使后续的构建步骤被跳过。
       - name: 安装构建与打包依赖
         run: |
           sudo apt-get update
@@ -132,6 +158,9 @@ jobs:
             libgtk-4-dev libwebkitgtk-6.0-dev
           pkg-config --atleast-version=4.14 gtk4
           pkg-config --exists webkitgtk-6.0
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
 
       - name: 构建并打包 deb / rpm
         env:
@@ -155,6 +184,8 @@ jobs:
   publish:
     name: 发布 Release
     needs: [macos, windows, linux-x64]
+    # 手动触发时只验证构建，不发布
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
