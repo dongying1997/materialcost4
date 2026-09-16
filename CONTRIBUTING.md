@@ -9,7 +9,7 @@
 | Go | 1.25+ | `brew install go` |
 | Node.js | 20+ | `brew install node` |
 | Wails CLI | 与 `go.mod` 中的 `v3.0.0-beta.12` 一致 | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
-| Task | 3.x | `brew install go-task`（`wails3 build` 依赖） |
+| Task | 3.x（实验证版本 3.53.1） | `brew install go-task`（`wails3 build` / `wails3 package` 依赖） |
 
 ```bash
 git clone https://github.com/dongying1997/materialcost4.git
@@ -119,6 +119,10 @@ wails3 task common:update:build-assets
    - **Linux** (`ubuntu-24.04`)：`.deb` 与 `.rpm`
 
 所有产物均**未做代码签名**（未持有 Apple Developer / Windows 代码签名证书）。Windows 上 NSIS 需要 runner 自带，由 `choco install nsis` 安装。
+
+### 为什么不用 arduino/setup-task
+
+Release 工作流中的 Task 运行器是**固定版本、直连下载**的，没有使用常见的 `arduino/setup-task` action，也不用 Task 官方 `install.sh`。原因是这两者都要访问 GitHub API 解析版本号，在 CI 共享出口 IP 上会撞上速率限制（实测 `arduino/setup-task` 报 `API rate limit exceeded`）。固定版本号并直接下载 release 资产可完全规避。升级 Task 版本时，需同时修改三个平台的下载步骤（macOS/Linux 为 `.tar.gz`，Windows 为 `.zip`）。
 
 ### 为什么 Linux 必须原生构建
 

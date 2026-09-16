@@ -87,7 +87,7 @@
 | Go | 1.25+ | `brew install go` |
 | Node.js | 20+ | `brew install node` |
 | Wails CLI | v3.0.0-beta.12 | `go install github.com/wailsapp/wails/v3/cmd/wails3@latest` |
-| Task | 3.x | `brew install go-task`（`wails3 build` / `wails3 package` 依赖） |
+| Task | 3.x（实验证版本 3.53.1） | `brew install go-task`（`wails3 build` / `wails3 package` 依赖） |
 
 > Wails v3 目前仍是 beta，请确保 CLI 版本与 `go.mod` 中的 `v3.0.0-beta.12` 一致，否则绑定生成可能不兼容。
 >
