@@ -31,3 +31,12 @@ export function fmtMoney(v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+/** 时间格式化：输出「2026年3月2日 16点32分25秒」；解析失败时原样返回，空值返回 '-' */
+export function fmtDateTime(v: string | null | undefined): string {
+  if (!v) return '-'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return v
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}点${p(d.getMinutes())}分${p(d.getSeconds())}秒`
+}

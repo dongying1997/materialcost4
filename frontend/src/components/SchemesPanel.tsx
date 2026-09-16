@@ -1,5 +1,6 @@
 import { Card, Space, List, Empty, Button, Popconfirm, Checkbox } from 'antd'
 import { FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons'
+import { fmtDateTime } from '../utils/file'
 import type { Scheme } from '../types'
 
 interface Props {
@@ -38,7 +39,7 @@ function SchemesPanel({ schemes, selectedIds, onToggleSelect, onLoad, onDelete }
                 <List.Item.Meta
                   title={<Space><span>{s.name}</span>
                     {s.note && <span style={{ color: '#999', fontSize: 12 }}>{s.note}</span>}</Space>}
-                  description={`${s.steps?.length || 0} 步 · 更新于 ${s.updatedAt || s.createdAt || '-'}`}
+                  description={`${s.steps?.length || 0} 步 · 更新于 ${fmtDateTime(s.updatedAt || s.createdAt)}`}
                 />
               </List.Item>
             )}

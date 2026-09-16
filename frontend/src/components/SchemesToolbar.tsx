@@ -19,7 +19,7 @@ function SchemesToolbar({
   return (
     <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       <Typography.Text style={{ marginRight: 4 }}>
-        管理工具{selectedCount > 0 && <span style={{ color: '#1677ff' }}>：已选 {selectedCount} 个方案</span>}
+        {selectedCount > 0 && <span style={{ color: '#1677ff' }}>：已选 {selectedCount} 个方案</span>}
       </Typography.Text>
       <Button
         type="primary"
