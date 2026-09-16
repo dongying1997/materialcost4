@@ -36,11 +36,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # 用官方脚本安装：arduino/setup-task 会调用 GitHub API 拉取 release，
-      # 在 CI 的共享出口 IP 上会撞上速率限制（实测报 "API rate limit exceeded"）。
-      # 该脚本直接下载二进制，不经过 API。
+      # 用官方安装脚本替代 arduino/setup-task：后者在 CI 共享出口 IP 上会撞上
+      # GitHub API 速率限制（实测 "API rate limit exceeded"）。
+      # 官方脚本对 releases/latest 的解析调用实际可用，能绕开该限制。
+      # set -e 保证下载失败时立即报错，而不是让后面的 task --version 报
+      # "command not found" 掩盖真实原因。
       - name: 安装 Task
         run: |
+          set -e
           curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
           task --version
 
@@ -77,8 +80,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Windows 原生跑安装脚本需要用 PowerShell 管道；不依赖 GitHub API，
-      # 避免 arduino/setup-task 的速率限制问题。
+      # 同 macOS，改用官方安装脚本来规避 arduino/setup-task 的 API 速率限制。
       - name: 安装 Task
         shell: pwsh
         run: |
@@ -142,6 +144,7 @@ jobs:
 
       - name: 安装 Task
         run: |
+          set -e
           curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
           task --version
 
