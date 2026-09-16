@@ -224,6 +224,10 @@ jobs:
           # 各平台单独计算的校验和丢弃，改由最终产物统一生成
           rm -f checksums-*.txt
 
+          # 删掉 NSIS 安装程序的构建输入（裸 exe），只发布安装程序本身，
+          # 否则用户会看到两个 Windows 文件而不知该下哪个
+          rm -f materialcost4.exe
+
           # 把平台标识写进文件名，避免用户拿到一堆同名文件分不清来源
           rename_if() { [ -f "$1" ] && mv "$1" "$2" || true; }
           rename_if materialcost4.dmg                 materialcost4-macos-universal.dmg
