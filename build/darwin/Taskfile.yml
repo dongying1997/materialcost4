@@ -134,6 +134,18 @@ tasks:
     cmds:
       - task: create:dmg
 
+  # 发布用：先合并出 arm64 + amd64 通用二进制，再打成 dmg。
+  #
+  # 不要改用上面的 package:dmg —— 它依赖的是 `package` → `build`，
+  # 只会构建宿主架构（在 Apple 芯片上即 arm64-only），Intel Mac 无法运行。
+  package:dmg:universal:
+    summary: Packages the universal binary (arm64 + amd64) into a styled `.dmg`
+    deps:
+      - task: build:universal
+    cmds:
+      - task: create:app:bundle
+      - task: create:dmg
+
   create:dmg:
     summary: Creates a configurable `.dmg` from the `.app` bundle
     platforms: [darwin]

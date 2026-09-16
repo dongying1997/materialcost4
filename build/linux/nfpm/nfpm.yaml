@@ -12,8 +12,9 @@ priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "化学反应的物料成本计算工具"
 vendor: "dongying1997"
-homepage: "https://wails.io"
-license: "MIT"
+homepage: "https://github.com/dongying1997/materialcost4"
+# 本项目尚未添加 LICENSE，此处不能声明具体许可证（见 README 的「许可」一节）。
+license: "Proprietary"
 release: "1"
 
 contents:

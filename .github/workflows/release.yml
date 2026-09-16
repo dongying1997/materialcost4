@@ -53,8 +53,11 @@ jobs:
       - name: 安装 Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
 
+      # 必须用 package:dmg:universal，不能用 Wails 模板默认的 package:dmg ——
+      # 后者依赖 `package` → `build`，只构建宿主架构（Apple 芯片 runner 上即
+      # arm64-only），Intel Mac 用户无法运行。
       - name: 构建通用二进制并打包为 dmg
-        run: wails3 task darwin:package:dmg
+        run: wails3 task darwin:package:dmg:universal
 
       - name: 生成校验和
         run: shasum -a 256 bin/*.dmg > bin/checksums-macos.txt && cat bin/checksums-macos.txt
