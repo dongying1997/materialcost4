@@ -36,15 +36,18 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # 用官方安装脚本替代 arduino/setup-task：后者在 CI 共享出口 IP 上会撞上
-      # GitHub API 速率限制（实测 "API rate limit exceeded"）。
-      # 官方脚本对 releases/latest 的解析调用实际可用，能绕开该限制。
-      # set -e 保证下载失败时立即报错，而不是让后面的 task --version 报
-      # "command not found" 掩盖真实原因。
+      # 直接下载固定版本的 tar.gz，不用 arduino/setup-task 也不用官方 install.sh：
+      # 两者都要访问 GitHub API 解析版本号，在 CI 共享出口 IP 上会撞速率限制
+      # （实测 arduino/setup-task 报 "API rate limit exceeded"）。固定版本并直连
+      # release 下载地址可完全避开该问题。
       - name: 安装 Task
         run: |
           set -e
-          curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
+          TASK_VERSION=3.53.1
+          curl -sSL -o /tmp/task.tar.gz \
+            "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_darwin_arm64.tar.gz"
+          tar -xzf /tmp/task.tar.gz -C /tmp task
+          sudo install -m 755 /tmp/task /usr/local/bin/task
           task --version
 
       - name: 安装 Wails CLI
@@ -80,14 +83,19 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # 同 macOS，改用官方安装脚本来规避 arduino/setup-task 的 API 速率限制。
+      # Task 官方没有提供 install.ps1（taskfile.dev/install.ps1 返回 404），
+      # 因此直接下载 Windows 版 zip 解压。固定版本号以免依赖 GitHub API 解析
+      # 最新 release（CI 共享 IP 上会撞速率限制）。
       - name: 安装 Task
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri https://taskfile.dev/install.ps1 -OutFile install-task.ps1
-          ./install-task.ps1 -BinDir "$env:USERPROFILE\bin" -Force
+          $version = "3.53.1"
+          $url = "https://github.com/go-task/task/releases/download/v$version/task_windows_amd64.zip"
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\bin" | Out-Null
+          Invoke-WebRequest -Uri $url -OutFile task.zip
+          Expand-Archive -Path task.zip -DestinationPath "$env:USERPROFILE\bin" -Force
           echo "$env:USERPROFILE\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          task --version
+          & "$env:USERPROFILE\bin\task.exe" --version
 
       - name: 安装 Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.12
@@ -142,10 +150,15 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # 同 macOS：固定版本直连下载，避开 GitHub API 速率限制
       - name: 安装 Task
         run: |
           set -e
-          curl -sL https://taskfile.dev/install.sh | sudo sh -s -- -b /usr/local/bin
+          TASK_VERSION=3.53.1
+          curl -sSL -o /tmp/task.tar.gz \
+            "https://github.com/go-task/task/releases/download/v${TASK_VERSION}/task_linux_amd64.tar.gz"
+          tar -xzf /tmp/task.tar.gz -C /tmp task
+          sudo install -m 755 /tmp/task /usr/local/bin/task
           task --version
 
       # 系统依赖必须在安装 Wails CLI 之前装好：`go install wails3` 会编译 Wails
