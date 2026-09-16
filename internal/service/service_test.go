@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 func newTestDB(t *testing.T) *db.DB {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 // MaterialRepo 物料与价格的仓储。

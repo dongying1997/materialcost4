@@ -3,8 +3,8 @@ package service
 import (
 	"fmt"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 // MaterialService 物料与价格管理服务。

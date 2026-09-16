@@ -8,8 +8,8 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/service"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/service"
 )
 
 //go:embed all:frontend/dist

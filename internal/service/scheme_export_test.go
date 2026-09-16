@@ -3,8 +3,8 @@ package service
 import (
 	"testing"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 func newSchemeSvc(t *testing.T) (*ReactionService, *db.SchemeRepo) {

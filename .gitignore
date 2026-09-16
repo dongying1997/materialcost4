@@ -14,3 +14,11 @@ build/android/gen/
 *.xml
 *.DS_Store
 *.iml
+
+# IDE
+/.idea/
+/.vscode/
+
+# Local tooling
+.claude/settings.local.json
+.task/

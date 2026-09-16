@@ -18,47 +18,47 @@ import * as models$0 from "../models/models.js";
  * DeleteMaterial 删除物料（级联删除价格）。
  */
 export function DeleteMaterial(id: number): $CancellablePromise<void> {
-    return $Call.ByID(2805078561, id);
+    return $Call.ByID(146704782, id);
 }
 
 /**
  * DeletePrice 删除价格。
  */
 export function DeletePrice(id: number): $CancellablePromise<void> {
-    return $Call.ByID(3134639461, id);
+    return $Call.ByID(813065008, id);
 }
 
 /**
  * GetMaterial 获取单个物料。
  */
 export function GetMaterial(id: number): $CancellablePromise<models$0.Material | null> {
-    return $Call.ByID(2718123616, id);
+    return $Call.ByID(2638822961, id);
 }
 
 /**
  * ListMaterials 物料列表（附带最新价格）。
  */
 export function ListMaterials(keyword: string): $CancellablePromise<(models$0.MaterialWithPrice | null)[] | null> {
-    return $Call.ByID(4028081179, keyword);
+    return $Call.ByID(107304826, keyword);
 }
 
 /**
  * ListPrices 价格列表。
  */
 export function ListPrices(materialID: number, keyword: string): $CancellablePromise<(models$0.Price | null)[] | null> {
-    return $Call.ByID(1004513437, materialID, keyword);
+    return $Call.ByID(3495576742, materialID, keyword);
 }
 
 /**
  * SaveMaterial 新增或更新物料。id 为 0 时新增。
  */
 export function SaveMaterial(m: models$0.Material | null): $CancellablePromise<models$0.Material | null> {
-    return $Call.ByID(1808630811, m);
+    return $Call.ByID(2155512948, m);
 }
 
 /**
  * SavePrice 新增或更新价格。id 为 0 时新增。
  */
 export function SavePrice(p: models$0.Price | null): $CancellablePromise<models$0.Price | null> {
-    return $Call.ByID(757422007, p);
+    return $Call.ByID(3115274014, p);
 }

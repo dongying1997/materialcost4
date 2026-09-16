@@ -18,7 +18,7 @@ import * as $models from "./models.js";
  * DownloadTemplate 生成导入模板（xlsx 字节）。
  */
 export function DownloadTemplate(): $CancellablePromise<string | null> {
-    return $Call.ByID(697685357);
+    return $Call.ByID(1189855640);
 }
 
 /**
@@ -27,7 +27,7 @@ export function DownloadTemplate(): $CancellablePromise<string | null> {
  * 返回保存的文件路径（用户取消时为空字符串）。
  */
 export function DownloadTemplateToFile(): $CancellablePromise<string> {
-    return $Call.ByID(368944394);
+    return $Call.ByID(3948899703);
 }
 
 /**
@@ -35,7 +35,7 @@ export function DownloadTemplateToFile(): $CancellablePromise<string> {
  * allPrices 为 false 时每物料一行（当前最新价格）；true 时每条价格记录一行（物料字段重复，无价格物料也出一行）。
  */
 export function ExportMaterials(allPrices: boolean): $CancellablePromise<string | null> {
-    return $Call.ByID(446214845, allPrices);
+    return $Call.ByID(3693814394, allPrices);
 }
 
 /**
@@ -45,12 +45,12 @@ export function ExportMaterials(allPrices: boolean): $CancellablePromise<string 
  * 返回保存的文件路径（用户取消时为空字符串）。
  */
 export function ExportMaterialsToFile(allPrices: boolean): $CancellablePromise<string> {
-    return $Call.ByID(2223970618, allPrices);
+    return $Call.ByID(4219649937, allPrices);
 }
 
 /**
  * ImportFromBytes 解析 Excel 并导入物料与价格。
  */
 export function ImportFromBytes(data: string | null, filename: string): $CancellablePromise<$models.ImportResult | null> {
-    return $Call.ByID(3909220749, data, filename);
+    return $Call.ByID(4242198842, data, filename);
 }

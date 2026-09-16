@@ -1,4 +1,4 @@
-module materialcost4
+module github.com/dongying1997/materialcost4
 
 go 1.25.0
 

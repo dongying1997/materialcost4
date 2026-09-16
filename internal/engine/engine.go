@@ -3,7 +3,7 @@ package engine
 import (
 	"math"
 
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 // CalculateStep 计算一步反应。prevProduct 为上一步产物（多步时传入，可为 nil）。

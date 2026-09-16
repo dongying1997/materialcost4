@@ -7,8 +7,8 @@ import (
 
 	"github.com/xuri/excelize/v2"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 func TestExcelImport(t *testing.T) {

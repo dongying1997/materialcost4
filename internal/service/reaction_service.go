@@ -9,9 +9,9 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
-	"materialcost4/internal/db"
-	"materialcost4/internal/engine"
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/engine"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 // ReactionService 反应成本计算服务。

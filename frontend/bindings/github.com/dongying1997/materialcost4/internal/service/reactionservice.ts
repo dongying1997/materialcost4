@@ -27,21 +27,21 @@ import * as $models from "./models.js";
  *  2. 将所选价格记录（或最新价格）换算为 元/kg 单价
  */
 export function Calculate(input: $models.CalculateInput): $CancellablePromise<engine$0.MultiStepResult | null> {
-    return $Call.ByID(3244114891, input);
+    return $Call.ByID(3415247734, input);
 }
 
 /**
  * DeleteScheme 删除方案。
  */
 export function DeleteScheme(id: number): $CancellablePromise<void> {
-    return $Call.ByID(3670791277, id);
+    return $Call.ByID(783483566, id);
 }
 
 /**
  * ExportSchemes 导出选中方案为 SchemeExportFile（纯函数，便于测试）。
  */
 export function ExportSchemes(ids: number[] | null): $CancellablePromise<$models.SchemeExportFile | null> {
-    return $Call.ByID(973350309, ids);
+    return $Call.ByID(1256995440, ids);
 }
 
 /**
@@ -50,21 +50,21 @@ export function ExportSchemes(ids: number[] | null): $CancellablePromise<$models
  * 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
  */
 export function ExportSchemesToFile(ids: number[] | null): $CancellablePromise<string> {
-    return $Call.ByID(3174661778, ids);
+    return $Call.ByID(4250726943, ids);
 }
 
 /**
  * FormatMoney 暴露给前端格式化金额。
  */
 export function FormatMoney(v: number): $CancellablePromise<string> {
-    return $Call.ByID(1443244158, v);
+    return $Call.ByID(741710839, v);
 }
 
 /**
  * GetScheme 获取单个方案。
  */
 export function GetScheme(id: number): $CancellablePromise<models$0.Scheme | null> {
-    return $Call.ByID(1733746088, id);
+    return $Call.ByID(3184332985, id);
 }
 
 /**
@@ -72,7 +72,7 @@ export function GetScheme(id: number): $CancellablePromise<models$0.Scheme | nul
  * 兼容两种结构：数组（[scheme, ...]）或 {version, app, schemes:[...]} 包裹格式。
  */
 export function ImportSchemes(data: string | null): $CancellablePromise<$models.SchemeImportResult | null> {
-    return $Call.ByID(2305019508, data);
+    return $Call.ByID(2662591393, data);
 }
 
 /**
@@ -80,26 +80,26 @@ export function ImportSchemes(data: string | null): $CancellablePromise<$models.
  * 返回导入结果与出现的问题（文件为空或无方案时返回错误）。
  */
 export function ImportSchemesFromFile(): $CancellablePromise<$models.SchemeImportResult | null> {
-    return $Call.ByID(868637802);
+    return $Call.ByID(3246473823);
 }
 
 /**
  * ListSchemes 方案列表。
  */
 export function ListSchemes(): $CancellablePromise<(models$0.Scheme | null)[] | null> {
-    return $Call.ByID(535480459);
+    return $Call.ByID(2765576286);
 }
 
 /**
  * PriceOptionsForMaterial 返回某物料的价格选项（供前端下拉选择）。
  */
 export function PriceOptionsForMaterial(materialID: number): $CancellablePromise<$models.MaterialPriceOption[] | null> {
-    return $Call.ByID(3841289918, materialID);
+    return $Call.ByID(1885373859, materialID);
 }
 
 /**
  * SaveScheme 保存方案（id 为 0 时新增）。
  */
 export function SaveScheme(sch: models$0.Scheme | null): $CancellablePromise<models$0.Scheme | null> {
-    return $Call.ByID(895005811, sch);
+    return $Call.ByID(3985361040, sch);
 }

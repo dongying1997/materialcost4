@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"materialcost4/internal/models"
+	"github.com/dongying1997/materialcost4/internal/models"
 )
 
 func f(v float64) *float64 { return &v }

@@ -2,13 +2,13 @@
 import type {
   Material, MaterialWithPrice, Price, ReactionStep, ReagentInput,
   ProductInput, Scheme,
-} from '../bindings/materialcost4/internal/models/models'
+} from '../bindings/github.com/dongying1997/materialcost4/internal/models/models'
 import type {
   MultiStepResult, StepResult, ReagentResult, ProductResult, IntermediateProduct,
-} from '../bindings/materialcost4/internal/engine/models'
+} from '../bindings/github.com/dongying1997/materialcost4/internal/engine/models'
 import type {
   MaterialPriceOption, ImportResult,
-} from '../bindings/materialcost4/internal/service/models'
+} from '../bindings/github.com/dongying1997/materialcost4/internal/service/models'
 
 export type {
   Material, MaterialWithPrice, Price, ReactionStep, ReagentInput,
