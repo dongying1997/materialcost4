@@ -1,16 +1,17 @@
-import { Card, Table, Radio, Select, InputNumber, Input, Button, Space, Tooltip, Tag } from 'antd'
-import { PlusOutlined, DeleteOutlined, UpOutlined, DownOutlined, LinkOutlined } from '@ant-design/icons'
+import { Card, Table, Radio, Select, InputNumber, Input, Button, Space, Tooltip, Tag, Dropdown } from 'antd'
+import { PlusOutlined, DeleteOutlined, UpOutlined, DownOutlined, LinkOutlined, HistoryOutlined, WarningOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type {
   MaterialWithPrice, StepResult, ReagentRow, ProductRow, StepRow, IntermediateProduct,
-  ReagentResult, ProductResult,
+  ReagentResult, ProductResult, PriceSnapshot,
 } from '../types'
 import { fmtNum, fmtMoney } from '../utils/file'
+import { priceDrifted, priceFromOption, emptyPrice, PRICE_DRIFT_THRESHOLD } from '../utils/reaction'
 
 // ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
 // 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
 // 名称区合计两表一致（原料：名称190+CAS110，产物：名称140+选物料160=300），
-// 其后分子量(第4列)、投料/实际产量kg(第8列)、成本(第10列)栅格完全重合。
+// 其后分子量(第4列)、投料/实际产量kg(第8列)、单位成本(第10列)栅格完全重合。
 const COL_RADIO  = 46    // 底物/产物单选
 const COL_NAME_R = 190   // 原料名称（Select）
 const COL_CAS    = 110   // CAS
@@ -18,7 +19,7 @@ const COL_NAME_P = 140   // 产物名称（Input）
 const COL_SELP   = 160   // 选物料（Select）
 const COL_NUM    = 100   // 数值输入列（分子量/含量/收率/当量/投料量等）
 const COL_RST    = 104   // 单价 / 理论产量
-const COL_COST   = 130   // 成本(元) / 单位成本(元/kg)
+const COL_COST   = 130   // 单位成本(元/kg)（原料与产物同列）
 const COL_DEL    = 44    // 删除按钮
 
 // 两表总宽一致；容器更宽时表格按 minWidth:100% 等比拉伸，两表始终对齐
@@ -27,6 +28,77 @@ const TOTAL_WIDTH = COL_RADIO + COL_NAME_R + COL_CAS + COL_NUM * 5 + COL_RST + C
 
 // 输入控件铺满所在单元格
 const fullInput = { width: '100%' } as const
+
+
+/**
+ * 单价单元格：可直接手动输入，也可从右侧图标下拉选物料库的历史价格。
+ *
+ * 布局：两个状态图标都放进输入框自带的 suffix 里，而不是并排的 flex 兄弟节点——
+ * 后者会挤占本就很窄的数值区域。suffix 由输入框内部留位，数值区宽度稳定。
+ *
+ * 价格冲突时以方案自带的快照为准，仅在差异超过阈值时提示，不自动改写。
+ */
+function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnapshot | null) => void }) {
+  const opts = row.priceOptions || []
+  const drifted = priceDrifted(row.price, row.latestPrice)
+  const latest = row.latestPrice
+  const current = row.price?.unitPriceYuanPerKg ?? 0
+
+  const driftMsg = drifted && latest
+    ? `库中最新价 ${fmtMoney(latest.pricePerKg)} 元/kg（${latest.date}${latest.supplier ? ' · ' + latest.supplier : ''}），与方案当前单价相差超过 ${PRICE_DRIFT_THRESHOLD} 元/kg。方案按快照计算，未自动更新。`
+    : ''
+
+  // 价格来源说明：有供应商/日期就显示，便于确认这个数字是从哪来的
+  const sourceMsg = row.price?.date || row.price?.supplier
+    ? `当前单价来自：${row.price?.date || '-'}${row.price?.supplier ? ' · ' + row.price.supplier : ''}${row.price?.spec ? ' · ' + row.price.spec : ''}`
+    : '手动输入单价'
+
+  const historyMenu = {
+    items: [
+      ...(drifted && latest
+        ? [{ key: 'hint', disabled: true, label: `库中最新价 ${fmtMoney(latest.pricePerKg)}（当前 ${fmtMoney(current)}）` }]
+        : []),
+      ...opts.map(o => ({
+        key: String(o.priceId),
+        label: `${o.date} ${o.price}${o.unit} → ${fmtMoney(o.pricePerKg)} 元/kg${o.supplier ? ' · ' + o.supplier : ''}`,
+      })),
+    ],
+    onClick: ({ key }: { key: string }) => {
+      const o = opts.find(x => String(x.priceId) === key)
+      if (o) onChange(priceFromOption(o))
+    },
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      <Tooltip title={drifted ? driftMsg : sourceMsg}>
+      <InputNumber
+        size="small"
+        style={{ flex: 1, minWidth: 0 }}
+        min={0}
+        step={0.01}
+        controls={false}
+        value={row.price ? current : null}
+        placeholder="填单价"
+        onChange={(v) => {
+          if (v === null || v === undefined) { onChange(null); return }
+          const n = typeof v === 'number' ? v : 0
+          // 手动改单价视为自定义报价：保留原有供应商/日期信息，仅换数值
+          onChange({ ...(row.price || emptyPrice()), unitPriceYuanPerKg: n, price: n, unit: '元/kg' })
+        }}
+      />
+      {drifted && <Tooltip title={driftMsg}><WarningOutlined style={{ color: '#faad14', fontSize: 12 }} /></Tooltip>}
+      {opts.length > 0 && (
+        <Tooltip title="从物料库的历史价格中选择">
+          <Dropdown trigger={['click']} menu={historyMenu} placement="bottomRight">
+            <HistoryOutlined style={{ fontSize: 12, color: '#1677ff', cursor: 'pointer' }} />
+          </Dropdown>
+        </Tooltip>
+      )}
+      </Tooltip>
+    </div>
+  )
+}
 
 interface Props {
   index: number
@@ -41,7 +113,7 @@ interface Props {
   onRemove: () => void
   onMoveUp?: () => void
   onMoveDown?: () => void
-  onPriceOptions?: (materialId: number, rowKey: string) => void
+  onPriceOptions?: (materialId: number) => void
 }
 
 function StepCard({ index, step, materials, result, totalShareMultiplier = 1, prevProduct, canInherit, onChange, onRemove, onMoveUp, onMoveDown, onPriceOptions }: Props) {
@@ -67,7 +139,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
         _key: `r${Math.random().toString(36).slice(2)}`,
         materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
         content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
-        equiv: null, amountKg: null, unitPriceYuanPerKg: null, priceSourceId: 0, priceOptions: [],
+        equiv: null, amountKg: null, price: null, priceOptions: [], latestPrice: null,
       }],
     })
   }
@@ -77,7 +149,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       _key: key, materialId: 0, inherited: true, name: prevProduct?.name || '（继承上一步产物）',
       cas: '', formula: '', molWeight: prevProduct?.molWeight || 0,
       content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
-      equiv: null, amountKg: null, unitPriceYuanPerKg: null, priceSourceId: 0, priceOptions: [],
+      equiv: null, amountKg: null, price: null, priceOptions: [], latestPrice: null,
     }
     const reagents = [...step.reagents]
     const last = reagents[reagents.length - 1]
@@ -97,8 +169,10 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       materialId, inherited: false, name: m.name, cas: m.cas, formula: m.formula,
       molWeight: m.molWeight, content: m.content || row.content,
       recoveryRate: row.recoveryRate || m.recoveryRate || 0,
-      priceSourceId: 0, unitPriceYuanPerKg: null, priceOptions: row.priceOptions,
+      price: null, priceOptions: [], latestPrice: null,
     })
+    // 选完物料后拉取该物料的历史价格，供下拉选择与价格变动提示
+    onPriceOptions?.(materialId)
   }
 
   const reagentColumns: ColumnsType<ReagentRow> = [
@@ -126,8 +200,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
           optionFilterProp="label" value={r.materialId || undefined}
           options={materials.map(m => ({ value: m.id, label: `${m.name}${m.cas ? `（${m.cas}）` : ''}` }))}
           onChange={(v) => {
-            if (v) { pickMaterial(r, v); onPriceOptions?.(v, r._key) }
-            else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], priceSourceId: 0 })
+            if (v) { pickMaterial(r, v) }
+            else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], latestPrice: null, price: null })
           }}
         />
       ),
@@ -180,18 +254,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
           const up = rr(idx)?.unitPrice
           return <span style={{ color: '#fa8c16', fontWeight: 500, fontSize: 13 }}>{up ? fmtMoney(up) : '（继承）'}</span>
         }
-        const opts = r.priceOptions || []
-        if (opts.length > 1) {
-          return (
-            <Select size="small" style={fullInput} value={r.priceSourceId || 0}
-              popupMatchSelectWidth={false}
-              options={opts.map(o => ({ value: o.priceId, label: `${o.date} ${o.price}${o.unit} ${o.spec} ${o.supplier}` }))}
-              onChange={(v) => updateReagent(r._key, { priceSourceId: v || 0 })}
-            />
-          )
-        }
-        const up = rr(idx)?.unitPrice
-        return <span style={{ fontSize: 13, color: up ? '#333' : '#bbb' }}>{up ? fmtMoney(up) : '自动'}</span>
+        return <PriceCell row={r} onChange={(p) => updateReagent(r._key, { price: p })} />
       },
     },
     {

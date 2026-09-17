@@ -12,9 +12,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as engine$0 from "../engine/models.js";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
 import * as models$0 from "../models/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -22,11 +19,12 @@ import * as models$0 from "../models/models.js";
 import * as $models from "./models.js";
 
 /**
- * Calculate 执行反应成本计算。计算前会自动：
- *  1. 为每个原料从物料库填充名称/分子量/含量/回收率等信息
- *  2. 将所选价格记录（或最新价格）换算为 元/kg 单价
+ * Calculate 执行反应成本计算。
+ * 
+ * 纯函数：完全不读物料库/价格库。方案自带全部输入（含价格快照），
+ * 因此换机器、清空物料库都不影响已保存方案的计算结果。
  */
-export function Calculate(input: $models.CalculateInput): $CancellablePromise<engine$0.MultiStepResult | null> {
+export function Calculate(input: $models.CalculateInput): $CancellablePromise<$models.CalculateResult | null> {
     return $Call.ByID(3415247734, input);
 }
 
@@ -69,7 +67,9 @@ export function GetScheme(id: number): $CancellablePromise<models$0.Scheme | nul
 
 /**
  * ImportSchemes 解析 JSON 内容并导入方案（name 为空或 steps 为空的方案跳过）。
- * 兼容两种结构：数组（[scheme, ...]）或 {version, app, schemes:[...]} 包裹格式。
+ * 
+ * 导入文件是自足的，不需要在目标库中解析或重连物料：materialId 一律清空，
+ * 计算直接用文件内的快照。这样跨机器导入不会出现 id 错指（静默算错钱）。
  */
 export function ImportSchemes(data: string | null): $CancellablePromise<$models.SchemeImportResult | null> {
     return $Call.ByID(2662591393, data);
@@ -92,6 +92,12 @@ export function ListSchemes(): $CancellablePromise<(models$0.Scheme | null)[] | 
 
 /**
  * PriceOptionsForMaterial 返回某物料的价格选项（供前端下拉选择）。
+ * 
+ * 这是「物料库仅作为查询来源」的入口：只在用户选物料/刷新价格/比对价格变动时调用，
+ * 计算路径完全不经过这里。
+ * 返回列表按报价日期倒序，因此 out[0] 即该物料在库中的最新价——
+ * 前端据此与方案自带的价格快照比对（差异阈值见前端 PRICE_DRIFT_THRESHOLD）。
+ * 物料已不在库中时返回空列表而不是报错。
  */
 export function PriceOptionsForMaterial(materialID: number): $CancellablePromise<$models.MaterialPriceOption[] | null> {
     return $Call.ByID(1885373859, materialID);

@@ -3,7 +3,6 @@
 
 export type {
     IntermediateProduct,
-    MultiStepResult,
     ProductResult,
     ReagentResult,
     StepResult

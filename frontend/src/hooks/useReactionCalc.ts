@@ -5,7 +5,7 @@ import { MaterialService, ReactionService } from '../bindings'
 import type {
   MaterialWithPrice, StepRow, MultiStepResult, MaterialPriceOption,
 } from '../types'
-import { newStep, stepsToPayload, backfillFromResult } from '../utils/reaction'
+import { newStep, stepsToPayload, backfillFromResult, upsertPriceOptions } from '../utils/reaction'
 import { usePersistedState } from './useStorage'
 
 const STORAGE_KEY = 'materialcost4:reaction-steps'
@@ -23,7 +23,7 @@ export interface ReactionCalcApi {
   moveStep: (index: number, direction: 1 | -1) => void
   clearAll: () => void
   recalculate: () => void
-  ensurePriceOptions: (materialId: number, rowKey: string, stepIdx: number) => void
+  ensurePriceOptions: (materialId: number) => void
 }
 
 /** 反应计算主状态：步骤编辑行、物料库、计算结果与实时计算（步骤内容持久化到 localStorage） */
@@ -52,6 +52,14 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   }, [messageApi])
   useEffect(() => { loadMaterials() }, [loadMaterials])
 
+  // 加载已有步骤后，为其中引用到的物料补齐历史价格与库中最新价
+  // （方案自带快照即可计算，这里只为价格变动提示提供对照）
+  useEffect(() => {
+    const ids = new Set(steps.flatMap(s => s.reagents.map(r => r.materialId)).filter(Boolean))
+    ids.forEach(id => { void ensurePriceOptions(id) })
+    // 只在物料集变化时触发，避免与 setSteps 形成循环
+  }, [steps.map(s => s.reagents.map(r => r.materialId).join(',')).join('|')]) // eslint-disable-line
+
   // 实时计算：steps 变化时（debounce 300ms）
   const calcRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const calculate = useCallback(async () => {
@@ -64,7 +72,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     } finally {
       setCalculating(false)
     }
-  }, [steps, messageApi])
+  }, [steps, setSteps, messageApi])
 
   useEffect(() => {
     if (calcRef.current) clearTimeout(calcRef.current)
@@ -94,25 +102,20 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     setResult(null)
   }
 
-  // 拉取某物料的价格选项
-  const ensurePriceOptions = async (materialId: number, rowKey: string, stepIdx: number) => {
+  // 拉取某物料的历史价格（库仅作查询来源）。
+  // 写入所有引用该物料的行，这样「库价 vs 方案快照」的差异提示在每行都能显示。
+  const ensurePriceOptions = async (materialId: number) => {
     if (!materialId) return
-    if (priceOptionsCache.current[materialId]) {
-      applyPriceOptions(materialId, rowKey, stepIdx)
-      return
+    if (!priceOptionsCache.current[materialId]) {
+      try {
+        const opts = await ReactionService.PriceOptionsForMaterial(materialId)
+        priceOptionsCache.current[materialId] = (opts || []) as MaterialPriceOption[]
+      } catch {
+        return // 查询失败就不写缓存，下次进页面可重试
+      }
     }
-    try {
-      const opts = await ReactionService.PriceOptionsForMaterial(materialId)
-      priceOptionsCache.current[materialId] = (opts || []) as MaterialPriceOption[]
-      applyPriceOptions(materialId, rowKey, stepIdx)
-    } catch { /* ignore */ }
-  }
-  const applyPriceOptions = (materialId: number, rowKey: string, stepIdx: number) => {
     const opts = priceOptionsCache.current[materialId]
-    setSteps(prev => prev.map((s, idx) => idx !== stepIdx ? s : ({
-      ...s,
-      reagents: s.reagents.map(r => r._key === rowKey ? { ...r, priceOptions: opts } : r),
-    })))
+    setSteps(prev => upsertPriceOptions(prev, materialId, opts))
   }
 
   // 重新计算按钮：计算结果后回填空缺字段
@@ -121,7 +124,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     try {
       const r = await ReactionService.Calculate({ steps: stepsToPayload(steps) })
       setResult(r as MultiStepResult)
-      // 数据无误时补全空缺数据（回填为推算值）
+      // 回填空缺数据（回填为推算值）
       const filled = backfillFromResult(steps, r as MultiStepResult)
       if (filled !== steps) setSteps(filled)
     } catch (e) {

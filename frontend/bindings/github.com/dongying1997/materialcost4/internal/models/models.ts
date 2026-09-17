@@ -121,6 +121,42 @@ export interface Price {
 }
 
 /**
+ * PriceSnapshot 价格快照：自足的价格信息，不依赖物料库/价格库。
+ * 方案保存与导出都以快照为准，因此换机器、清空物料库都不影响已保存的方案。
+ */
+export interface PriceSnapshot {
+    /**
+     * 单价(元/kg)，引擎直接使用（权威数值）
+     */
+    "unitPriceYuanPerKg": number;
+
+    /**
+     * 原始报价值（按 Unit 计）
+     */
+    "price": number;
+
+    /**
+     * 原始报价单位：元/kg | 元/g | 元/mol
+     */
+    "unit": string;
+
+    /**
+     * 供应商
+     */
+    "supplier": string;
+
+    /**
+     * 报价日期（YYYY-MM-DD）
+     */
+    "date": string;
+
+    /**
+     * 规格
+     */
+    "spec": string;
+}
+
+/**
  * ProductInput 一步反应中的一个产物
  */
 export interface ProductInput {
@@ -177,7 +213,7 @@ export interface ReactionStep {
  */
 export interface ReagentInput {
     /**
-     * 0 表示继承的中间产物
+     * 物料库中的 id；仅作可选活链接（刷新价格/跳转），不参与计算
      */
     "materialId": number;
 
@@ -216,14 +252,9 @@ export interface ReagentInput {
     "amountKg": number | null;
 
     /**
-     * 单价(元/kg)（可为空，多价格时由前端选择）
+     * 价格快照（nil = 未设置价格，成本按 0 计）
      */
-    "unitPriceYuanPerKg": number | null;
-
-    /**
-     * 选中的价格记录 id（0 自动取最新）
-     */
-    "priceSourceId": number;
+    "price": PriceSnapshot | null;
 }
 
 /**

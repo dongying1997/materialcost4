@@ -18,7 +18,7 @@ func TestSingleStepBasic(t *testing.T) {
 	// 产物 P：分子量 150，重量收率 80%
 	reagents := []models.ReagentInput{
 		{Name: "A", MolWeight: 100, Content: 98, RecoveryRate: 0, IsSubstrate: true, AmountKg: f(1)},
-		{Name: "B", MolWeight: 50, Content: 99, RecoveryRate: 5, IsSubstrate: false, Equiv: f(1.5), UnitPriceYuanPerKg: f(100)},
+		{Name: "B", MolWeight: 50, Content: 99, RecoveryRate: 5, IsSubstrate: false, Equiv: f(1.5), Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 100}},
 	}
 	products := []models.ProductInput{
 		{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
@@ -111,7 +111,7 @@ func TestMultiStepInheritance(t *testing.T) {
 	// 第一步：A → I，I 为主产物
 	step1 := models.ReactionStep{
 		Reagents: []models.ReagentInput{
-			{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1), UnitPriceYuanPerKg: f(10)},
+			{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1), Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
 		},
 		Products: []models.ProductInput{
 			{Name: "I", MolWeight: 120, IsSubstrate: true, WeightYield: f(50)},
@@ -121,7 +121,7 @@ func TestMultiStepInheritance(t *testing.T) {
 	step2 := models.ReactionStep{
 		Reagents: []models.ReagentInput{
 			{Name: "I(继承)", Inherited: true, IsSubstrate: true, AmountKg: f(0.4)},
-			{Name: "C", MolWeight: 200, Content: 100, IsSubstrate: false, Equiv: f(2), UnitPriceYuanPerKg: f(5)},
+			{Name: "C", MolWeight: 200, Content: 100, IsSubstrate: false, Equiv: f(2), Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 5}},
 		},
 		Products: []models.ProductInput{
 			{Name: "P", MolWeight: 200, IsSubstrate: true, WeightYield: f(60)},

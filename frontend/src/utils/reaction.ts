@@ -1,5 +1,36 @@
 // 反应计算的辅助函数：步骤对象构造与前后端数据序列化
-import type { StepRow, MultiStepResult, ReactionStep } from '../types'
+import type {
+  StepRow, MultiStepResult, ReactionStep, MaterialPriceOption, PriceSnapshot,
+} from '../types'
+
+/** 价格快照与库中最新价的差异阈值（元/kg），超过则提示用户 */
+export const PRICE_DRIFT_THRESHOLD = 0.01
+
+/** 空快照（未设置价格） */
+export const emptyPrice = (): PriceSnapshot => ({
+  unitPriceYuanPerKg: 0, price: 0, unit: '元/kg', supplier: '', date: '', spec: '',
+})
+
+/** 由物料库的历史价格选项构造价格快照（下拉选择时用） */
+export function priceFromOption(o: MaterialPriceOption): PriceSnapshot {
+  return {
+    unitPriceYuanPerKg: o.pricePerKg,
+    price: o.price,
+    unit: o.unit,
+    supplier: o.supplier,
+    date: o.date,
+    spec: o.spec,
+  }
+}
+
+/**
+ * 库中最新价与方案快照的差异是否已超出阈值。
+ * 以快照为准计算，仅在差异明显时提示用户，不自动改写。
+ */
+export function priceDrifted(price: PriceSnapshot | null | undefined, latest?: MaterialPriceOption | null): boolean {
+  if (!price || !latest) return false
+  return Math.abs(latest.pricePerKg - price.unitPriceYuanPerKg) > PRICE_DRIFT_THRESHOLD
+}
 
 let keySeq = 0
 
@@ -18,7 +49,7 @@ export function newStep(): StepRow {
       _key: uid('r'),
       materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
       content: 100, recoveryRate: 0, isSubstrate: true, equiv: null, amountKg: null,
-      unitPriceYuanPerKg: null, priceSourceId: 0, priceOptions: [],
+      price: null, priceOptions: [], latestPrice: null,
     }],
     products: [{
       _key: uid('p'),
@@ -36,7 +67,7 @@ export function stepsToPayload(steps: StepRow[]): ReactionStep[] {
       materialId: r.materialId, inherited: r.inherited, name: r.name, cas: r.cas,
       formula: r.formula, molWeight: r.molWeight, content: r.content, recoveryRate: r.recoveryRate,
       isSubstrate: r.isSubstrate, equiv: r.equiv, amountKg: r.amountKg,
-      unitPriceYuanPerKg: r.unitPriceYuanPerKg, priceSourceId: r.priceSourceId,
+      price: r.price,
     })),
     products: s.products.map(p => ({
       materialId: p.materialId, inherited: p.inherited, name: p.name, cas: p.cas,
@@ -53,12 +84,33 @@ export function stepsFromScheme(steps: ReactionStep[] | null | undefined): StepR
     _key: uid('s'),
     id: s.id, stepNum: s.stepNum, name: s.name,
     reagents: (s.reagents || []).map(r => ({
-      ...r, _key: uid('r'), priceOptions: [],
+      ...r, _key: uid('r'), priceOptions: [], latestPrice: null,
     })),
     products: (s.products || []).map(p => ({
       ...p, _key: uid('p'),
     })),
   }))
+}
+
+/**
+ * 把某物料的价格选项、库中最新价写入所有引用该物料的行。
+ * 最新价用于与方案自带的价格快照比对（差异 > 阈值时在单价单元格提示）。
+ */
+export function upsertPriceOptions(
+  steps: StepRow[], materialId: number, opts: MaterialPriceOption[],
+): StepRow[] {
+  if (!materialId) return steps
+  const latest = opts[0] || null // 后端按日期倒序返回
+  let changed = false
+  const out = steps.map(s => ({
+    ...s,
+    reagents: s.reagents.map(r => {
+      if (r.materialId !== materialId) return r
+      changed = true
+      return { ...r, priceOptions: opts, latestPrice: latest }
+    }),
+  }))
+  return changed ? out : steps
 }
 
 /** 四舍五入到两位小数 */

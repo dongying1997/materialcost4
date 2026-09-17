@@ -12,6 +12,7 @@ export {
 
 export type {
     CalculateInput,
+    CalculateResult,
     ImportResult,
     MaterialPriceOption,
     SchemeExportFile,

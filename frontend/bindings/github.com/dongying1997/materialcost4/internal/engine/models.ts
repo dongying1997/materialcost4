@@ -20,28 +20,6 @@ export interface IntermediateProduct {
 }
 
 /**
- * MultiStepResult 多步反应的完整结果。
- */
-export interface MultiStepResult {
-    "steps": (StepResult | null)[] | null;
-
-    /**
-     * 总成本（元）= 各步总成本之和
-     */
-    "totalCost": number;
-
-    /**
-     * 总产量（kg）= 最后一步主产物实际产量
-     */
-    "totalYieldKg": number;
-
-    /**
-     * 总单位成本（元/kg）= 总成本 ÷ 总产量
-     */
-    "totalUnitCost": number;
-}
-
-/**
  * ProductResult 单个产物的计算结果。
  */
 export interface ProductResult {

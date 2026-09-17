@@ -3,6 +3,9 @@
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as engine$0 from "../engine/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as models$0 from "../models/models.js";
 
 /**
@@ -10,6 +13,28 @@ import * as models$0 from "../models/models.js";
  */
 export interface CalculateInput {
     "steps": models$0.ReactionStep[] | null;
+}
+
+/**
+ * CalculateResult 计算结果。
+ */
+export interface CalculateResult {
+    "steps": (engine$0.StepResult | null)[] | null;
+
+    /**
+     * 总成本（元）= 各步总成本之和
+     */
+    "totalCost": number;
+
+    /**
+     * 总产量（kg）= 最后一步主产物实际产量
+     */
+    "totalYieldKg": number;
+
+    /**
+     * 总单位成本（元/kg）= 总成本 ÷ 总产量
+     */
+    "totalUnitCost": number;
 }
 
 /**
@@ -58,7 +83,11 @@ export interface MaterialPriceOption {
 }
 
 /**
- * SchemeExportFile 方案导出文件：JSON 数组，含导出信息字段，便于识别文件格式。
+ * SchemeExportFile 方案导出文件。
+ * 
+ * 导出内容是自足的：每行原料都带名称/分子式/分子量/含量/回收率以及价格快照，
+ * 不含任何物料库或价格库的 id（materialId 会被清空）。因此导出文件可直接
+ * 在另一台机器导入使用，无需目标机器存在同名物料，也不需要任何重连匹配。
  */
 export interface SchemeExportFile {
     "version": number;

@@ -5,6 +5,7 @@ export type {
     Material,
     MaterialWithPrice,
     Price,
+    PriceSnapshot,
     ProductInput,
     ReactionStep,
     ReagentInput,

@@ -1,7 +1,9 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,92 +31,19 @@ type CalculateInput struct {
 	Steps []models.ReactionStep `json:"steps"`
 }
 
-// Calculate 执行反应成本计算。计算前会自动：
-//  1. 为每个原料从物料库填充名称/分子量/含量/回收率等信息
-//  2. 将所选价格记录（或最新价格）换算为 元/kg 单价
-func (s *ReactionService) Calculate(input CalculateInput) (*engine.MultiStepResult, error) {
-	steps, err := s.enrichSteps(input.Steps)
-	if err != nil {
-		return nil, err
-	}
-	return engine.CalculateMultiStep(steps), nil
+// Calculate 执行反应成本计算。
+//
+// 纯函数：完全不读物料库/价格库。方案自带全部输入（含价格快照），
+// 因此换机器、清空物料库都不影响已保存方案的计算结果。
+func (s *ReactionService) Calculate(input CalculateInput) (*CalculateResult, error) {
+	return &CalculateResult{
+		MultiStepResult: *engine.CalculateMultiStep(input.Steps),
+	}, nil
 }
 
-// enrichSteps 为每一步的原料补充物料库信息与价格。
-func (s *ReactionService) enrichSteps(steps []models.ReactionStep) ([]models.ReactionStep, error) {
-	out := make([]models.ReactionStep, len(steps))
-	for i, step := range steps {
-		reagents := make([]models.ReagentInput, len(step.Reagents))
-		for j, r := range step.Reagents {
-			reagents[j] = r
-			if r.Inherited {
-				continue // 继承原料保持前端传入的值（引擎会填充单价/分子量）
-			}
-			if r.MaterialID <= 0 {
-				continue // 手动输入的原料（未从物料库选择），保持原值
-			}
-			mat, err := s.materialRepo.Get(r.MaterialID)
-			if err != nil {
-				return nil, err
-			}
-			if mat != nil {
-				reagents[j].Name = mat.Name
-				reagents[j].CAS = mat.CAS
-				reagents[j].Formula = mat.Formula
-				reagents[j].MolWeight = mat.MolWeight
-				if r.Content == 0 {
-					reagents[j].Content = mat.Content
-				}
-				if r.RecoveryRate == 0 && mat.RecoveryRate > 0 {
-					reagents[j].RecoveryRate = mat.RecoveryRate
-				}
-				// 价格：优先前端选定的价格记录，否则自动取最新
-				var price *models.Price
-				if r.PriceSourceID > 0 {
-					price, err = s.materialRepo.FindPrice(r.PriceSourceID)
-					if err != nil {
-						return nil, err
-					}
-				}
-				if price == nil {
-					price, _, err = s.materialRepo.LatestPrice(mat.ID)
-					if err != nil {
-						return nil, err
-					}
-				}
-				if price != nil {
-					unitPrice, warn := PriceToYuanPerKg(price.Price, price.Unit, mat.MolWeight)
-					_ = warn // 警告会展示在前端
-					reagents[j].UnitPriceYuanPerKg = &unitPrice
-				}
-			}
-		}
-		step.Reagents = reagents
-		// 产物：填充物料库信息
-		products := make([]models.ProductInput, len(step.Products))
-		for j, p := range step.Products {
-			products[j] = p
-			if p.Inherited {
-				continue
-			}
-			if p.MaterialID <= 0 {
-				continue // 手动输入的产物，保持原值
-			}
-			mat, err := s.materialRepo.Get(p.MaterialID)
-			if err != nil {
-				return nil, err
-			}
-			if mat != nil {
-				products[j].Name = mat.Name
-				products[j].CAS = mat.CAS
-				products[j].Formula = mat.Formula
-				products[j].MolWeight = mat.MolWeight
-			}
-		}
-		step.Products = products
-		out[i] = step
-	}
-	return out, nil
+// CalculateResult 计算结果。
+type CalculateResult struct {
+	engine.MultiStepResult
 }
 
 // MaterialPriceOption 物料可选价格下拉项。
@@ -131,12 +60,21 @@ type MaterialPriceOption struct {
 }
 
 // PriceOptionsForMaterial 返回某物料的价格选项（供前端下拉选择）。
+//
+// 这是「物料库仅作为查询来源」的入口：只在用户选物料/刷新价格/比对价格变动时调用，
+// 计算路径完全不经过这里。
+// 返回列表按报价日期倒序，因此 out[0] 即该物料在库中的最新价——
+// 前端据此与方案自带的价格快照比对（差异阈值见前端 PRICE_DRIFT_THRESHOLD）。
+// 物料已不在库中时返回空列表而不是报错。
 func (s *ReactionService) PriceOptionsForMaterial(materialID int64) ([]MaterialPriceOption, error) {
-	prices, err := s.materialRepo.ListPrices(materialID, "")
+	mat, err := s.materialRepo.Get(materialID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return []MaterialPriceOption{}, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	mat, err := s.materialRepo.Get(materialID)
+	prices, err := s.materialRepo.ListPrices(materialID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -201,13 +139,20 @@ func (s *ReactionService) DeleteScheme(id int64) error {
 
 // ---- 方案 JSON 导出 / 导入 ----
 
-// SchemeExportFile 方案导出文件：JSON 数组，含导出信息字段，便于识别文件格式。
+// SchemeExportFile 方案导出文件。
+//
+// 导出内容是自足的：每行原料都带名称/分子式/分子量/含量/回收率以及价格快照，
+// 不含任何物料库或价格库的 id（materialId 会被清空）。因此导出文件可直接
+// 在另一台机器导入使用，无需目标机器存在同名物料，也不需要任何重连匹配。
 type SchemeExportFile struct {
 	Version    int              `json:"version"`
 	App        string           `json:"app"`
 	ExportedAt string           `json:"exportedAt"`
 	Schemes    []*models.Scheme `json:"schemes"`
 }
+
+// schemeExportVersion 当前导出格式版本。
+const schemeExportVersion = 2
 
 // ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
 // ids 为空表示导出全部方案。返回保存的文件路径（用户取消时为空字符串）。
@@ -254,17 +199,41 @@ func (s *ReactionService) ExportSchemes(ids []int64) (*SchemeExportFile, error) 
 		return nil, err
 	}
 	export := &SchemeExportFile{
-		Version:    1,
+		Version:    schemeExportVersion,
 		App:        "MaterialCost4",
 		ExportedAt: time.Now().Format("2006-01-02 15:04:05"),
 		Schemes:    []*models.Scheme{},
 	}
 	for _, sch := range all {
 		if len(ids) == 0 || selected[sch.ID] {
-			export.Schemes = append(export.Schemes, sch)
+			export.Schemes = append(export.Schemes, detachFromLibrary(sch))
 		}
 	}
 	return export, nil
+}
+
+// detachFromLibrary 复制方案并剥离全部本地库 id，使其可在任意机器导入。
+// 保留业务快照（名称/CAS/分子式/分子量/含量/回收率/价格快照），丢弃 materialId。
+func detachFromLibrary(sch *models.Scheme) *models.Scheme {
+	out := *sch
+	out.Steps = make([]models.ReactionStep, len(sch.Steps))
+	for i, st := range sch.Steps {
+		ns := st
+		ns.Reagents = make([]models.ReagentInput, len(st.Reagents))
+		for j, r := range st.Reagents {
+			nr := r
+			nr.MaterialID = 0
+			ns.Reagents[j] = nr
+		}
+		ns.Products = make([]models.ProductInput, len(st.Products))
+		for j, p := range st.Products {
+			np := p
+			np.MaterialID = 0
+			ns.Products[j] = np
+		}
+		out.Steps[i] = ns
+	}
+	return &out
 }
 
 // ImportSchemesFromFile 弹出打开对话框选择 JSON 文件并导入方案。
@@ -297,19 +266,16 @@ type SchemeImportResult struct {
 }
 
 // ImportSchemes 解析 JSON 内容并导入方案（name 为空或 steps 为空的方案跳过）。
-// 兼容两种结构：数组（[scheme, ...]）或 {version, app, schemes:[...]} 包裹格式。
+//
+// 导入文件是自足的，不需要在目标库中解析或重连物料：materialId 一律清空，
+// 计算直接用文件内的快照。这样跨机器导入不会出现 id 错指（静默算错钱）。
 func (s *ReactionService) ImportSchemes(data []byte) (*SchemeImportResult, error) {
 	result := &SchemeImportResult{Errors: []string{}}
-	// 先尝试数组结构
-	var list []*models.Scheme
-	if err := json.Unmarshal(data, &list); err != nil {
-		// 再尝试导出文件结构
-		var file SchemeExportFile
-		if err2 := json.Unmarshal(data, &file); err2 != nil || file.Schemes == nil {
-			return nil, fmt.Errorf("无法解析 JSON 文件：不是有效的方案导出文件")
-		}
-		list = file.Schemes
+	var file SchemeExportFile
+	if err := json.Unmarshal(data, &file); err != nil || file.Schemes == nil {
+		return nil, fmt.Errorf("无法解析 JSON 文件：不是有效的方案导出文件")
 	}
+	list := file.Schemes
 	if len(list) == 0 {
 		return result, nil
 	}
@@ -318,6 +284,15 @@ func (s *ReactionService) ImportSchemes(data []byte) (*SchemeImportResult, error
 			continue
 		}
 		sch.ID = 0 // 导入为新建，避免覆盖已有方案
+		// 清空本地库引用：id 只在本机有意义，跨机器可能指向完全不同的物料
+		for si := range sch.Steps {
+			for ri := range sch.Steps[si].Reagents {
+				sch.Steps[si].Reagents[ri].MaterialID = 0
+			}
+			for pi := range sch.Steps[si].Products {
+				sch.Steps[si].Products[pi].MaterialID = 0
+			}
+		}
 		if sch.Name == "" {
 			result.Errors = append(result.Errors, fmt.Sprintf("第 %d 项：方案名称缺失，已跳过", i+1))
 			continue

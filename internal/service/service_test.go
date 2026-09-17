@@ -164,6 +164,73 @@ func TestClearAllMaterials(t *testing.T) {
 	}
 }
 
+// TestCalculateIgnoresMaterialLibrary 回归测试：计算是纯函数，完全不读物料库。
+// 用一个库中不存在的 materialId，计算仍应正常出结果（方案自带全部输入）。
+func TestCalculateIgnoresMaterialLibrary(t *testing.T) {
+	d := newTestDB(t)
+	svc := NewReactionService(db.NewMaterialRepo(d), db.NewSchemeRepo(d))
+
+	steps := []models.ReactionStep{{
+		StepNum: 1, Name: "反应1",
+		Reagents: []models.ReagentInput{{
+			MaterialID: 99999, // 库中不存在
+			Name:       "1,4-环己二醇", MolWeight: 116.16, Content: 100,
+			IsSubstrate: true, AmountKg: f(1),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10},
+		}},
+		Products: []models.ProductInput{
+			{Name: "M163", MolWeight: 226.27, WeightYield: f(100)},
+		},
+	}}
+
+	res, err := svc.Calculate(CalculateInput{Steps: steps})
+	if err != nil {
+		t.Fatalf("Calculate 不应读库、不应报错，实际: %v", err)
+	}
+	if len(res.Steps) != 1 || len(res.Steps[0].BlockingErrors) != 0 {
+		t.Fatalf("unexpected result: %+v", res.Steps[0])
+	}
+	// 单价取自快照 → 成本 = 1kg × 10元/kg × (1-0%) = 10
+	if got := res.Steps[0].TotalCost; got != 10 {
+		t.Errorf("总成本 = %v, want 10（单价应取自快照）", got)
+	}
+}
+
+// TestPriceSnapshotOverridesLibrary 价格快照优先：库里的价格再新也不影响已保存方案。
+func TestPriceSnapshotOverridesLibrary(t *testing.T) {
+	d := newTestDB(t)
+	repo := db.NewMaterialRepo(d)
+	svc := NewReactionService(repo, db.NewSchemeRepo(d))
+
+	id, err := repo.Insert(&models.Material{Name: "甲醇", CAS: "67-56-1", MolWeight: 32.04, Content: 99.5})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 库里放一条价格 999，方案快照里是 10 —— 应取 10
+	if _, err := repo.InsertPrice(&models.Price{
+		MaterialID: id, Price: 999, Unit: "元/kg",
+		Date: time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	steps := []models.ReactionStep{{
+		StepNum: 1,
+		Reagents: []models.ReagentInput{{
+			MaterialID: id, MolWeight: 32.04, Content: 99.5, IsSubstrate: true, AmountKg: f(1),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10},
+		}},
+		Products: []models.ProductInput{{Name: "P", MolWeight: 46.07, WeightYield: f(80)}},
+	}}
+	res, err := svc.Calculate(CalculateInput{Steps: steps})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Steps[0].TotalCost; got != 10 {
+		t.Errorf("总成本 = %v, want 10（快照优先于库中最新价 999）", got)
+	}
+}
+
 func TestSchemeSaveLoad(t *testing.T) {
 	d := newTestDB(t)
 	repo := db.NewMaterialRepo(d)

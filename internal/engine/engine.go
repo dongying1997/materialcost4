@@ -127,15 +127,25 @@ func injectInheritedReagent(step *models.ReactionStep, prev *IntermediateProduct
 			r := &step.Reagents[i]
 			r.MolWeight = prev.MolWeight
 			r.Name = prev.Name
-			up := prev.UnitCost
-			r.UnitPriceYuanPerKg = &up
+			// 上一步产物的单位成本即本行“单价”，以快照形式写入（引擎只认快照）
+			r.Price = &models.PriceSnapshot{
+				UnitPriceYuanPerKg: prev.UnitCost,
+				Price:              prev.UnitCost,
+				Unit:               "元/kg",
+				Supplier:           "上一步产物",
+			}
 			return
 		}
 	}
 }
 
+// computeReagent 计算单个原料的成本。
 func computeReagent(r models.ReagentInput, n0 float64, isSubstrate bool, stepBlocking []string) ReagentResult {
-	rr := ReagentResult{UnitPrice: f64(r.UnitPriceYuanPerKg)}
+	// 单价一律取价格快照：方案自足，计算不依赖物料库/价格库。
+	var rr ReagentResult
+	if r.Price != nil {
+		rr.UnitPrice = r.Price.UnitPriceYuanPerKg
+	}
 
 	if r.MolWeight <= 0 {
 		rr.BlockingErrors = append(rr.BlockingErrors, nameOf(&r)+"：缺少分子量")

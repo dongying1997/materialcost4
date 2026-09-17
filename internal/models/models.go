@@ -50,21 +50,31 @@ type ReactionStep struct {
 	Products []ProductInput `json:"products"`
 }
 
+// PriceSnapshot 价格快照：自足的价格信息，不依赖物料库/价格库。
+// 方案保存与导出都以快照为准，因此换机器、清空物料库都不影响已保存的方案。
+type PriceSnapshot struct {
+	UnitPriceYuanPerKg float64 `json:"unitPriceYuanPerKg"` // 单价(元/kg)，引擎直接使用（权威数值）
+	Price              float64 `json:"price"`              // 原始报价值（按 Unit 计）
+	Unit               string  `json:"unit"`               // 原始报价单位：元/kg | 元/g | 元/mol
+	Supplier           string  `json:"supplier"`           // 供应商
+	Date               string  `json:"date"`               // 报价日期（YYYY-MM-DD）
+	Spec               string  `json:"spec"`               // 规格
+}
+
 // ReagentInput 一步反应中的一个原料（输入）
 type ReagentInput struct {
-	MaterialID         int64    `json:"materialId"` // 0 表示继承的中间产物
-	Inherited          bool     `json:"inherited"`  // 是否继承自上一步产物
-	Name               string   `json:"name"`
-	CAS                string   `json:"cas"`
-	Formula            string   `json:"formula"`
-	MolWeight          float64  `json:"molWeight"`
-	Content            float64  `json:"content"`            // 含量(%)
-	RecoveryRate       float64  `json:"recoveryRate"`       // 回收率(%)
-	IsSubstrate        bool     `json:"isSubstrate"`        // 是否底物(基准 1 eq)
-	Equiv              *float64 `json:"equiv"`              // 当量（可为空）
-	AmountKg           *float64 `json:"amountKg"`           // 实际投料量(kg)（可为空）
-	UnitPriceYuanPerKg *float64 `json:"unitPriceYuanPerKg"` // 单价(元/kg)（可为空，多价格时由前端选择）
-	PriceSourceID      int64    `json:"priceSourceId"`      // 选中的价格记录 id（0 自动取最新）
+	MaterialID   int64          `json:"materialId"` // 物料库中的 id；仅作可选活链接（刷新价格/跳转），不参与计算
+	Inherited    bool           `json:"inherited"`  // 是否继承自上一步产物
+	Name         string         `json:"name"`
+	CAS          string         `json:"cas"`
+	Formula      string         `json:"formula"`
+	MolWeight    float64        `json:"molWeight"`
+	Content      float64        `json:"content"`      // 含量(%)
+	RecoveryRate float64        `json:"recoveryRate"` // 回收率(%)
+	IsSubstrate  bool           `json:"isSubstrate"`  // 是否底物(基准 1 eq)
+	Equiv        *float64       `json:"equiv"`        // 当量（可为空）
+	AmountKg     *float64       `json:"amountKg"`     // 实际投料量(kg)（可为空）
+	Price        *PriceSnapshot `json:"price"`        // 价格快照（nil = 未设置价格，成本按 0 计）
 }
 
 // ProductInput 一步反应中的一个产物

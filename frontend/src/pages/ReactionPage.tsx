@@ -74,7 +74,7 @@ function ReactionPage() {
             onRemove={() => calc.removeStep(i)}
             onMoveUp={i > 0 ? () => calc.moveStep(i, -1) : undefined}
             onMoveDown={i < calc.steps.length - 1 ? () => calc.moveStep(i, 1) : undefined}
-            onPriceOptions={(mid, key) => calc.ensurePriceOptions(mid, key, i)}
+            onPriceOptions={(mid) => calc.ensurePriceOptions(mid)}
           />
         ))}
       </div>
