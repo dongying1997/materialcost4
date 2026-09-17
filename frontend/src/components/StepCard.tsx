@@ -110,12 +110,17 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
         ? [{ key: 'hint', disabled: true, label: `库中最新价 ${fmtMoney(latest.pricePerKg)}（当前 ${fmtMoney(current)}）` }]
         : []),
       ...opts.map(o => {
-        // 标签以「日期 + 单价」为主，元/kg 时不再补一段「→ 20.00 元/kg」——
-        // 换算值与原值相同，纯属重复。但 元/g 与 元/mol 的换算值反推不回去
-        // （元/mol 要除以分子量），是这条报价唯一能横向比较成本的数字，
-        // 故仅在单位确实不是 元/kg 时才补上箭头那一段。
+        // 标签以「日期 + 单价」为主；只有 元/g 与 元/mol 才补上「→ x 元/kg」——
+        // 元/kg 报价的换算值与原值相同，再写一遍纯属重复。
+        //
+        // 这半个箭头不能一概删掉：换算后的 元/kg 是反推不回去的（元/mol 要除以
+        // 分子量），也是这些报价唯一能横向比较成本的数字。
+        //
+        // 判断依据是单位本身，对应 internal/service/price.go 的 PriceToYuanPerKg
+        // ——它的 default 分支把其余单位（含空串）一律当作 元/kg 原样返回。若改成
+        // 比较「换算值是否等于原值」，一个空单位就会凑出「20.00 → 20.00 元/kg」。
         const raw = `${fmtMoney(o.price)}${o.unit || ''}`
-        const needConv = (o.unit || '').trim() !== '元/kg'
+        const needConv = ['元/g', '元/mol'].includes((o.unit || '').trim())
         const price = needConv ? `${raw} → ${fmtMoney(o.pricePerKg)} 元/kg` : raw
         return { key: String(o.priceId), label: `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}` }
       }),
