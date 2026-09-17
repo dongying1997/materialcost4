@@ -99,6 +99,12 @@ export interface ReagentResult {
     "cost": number;
 
     /**
+     * 单位成本（元/kg）= 本原料成本 ÷ 本步主产物实际产量。
+     * 无主产物或产量为 0 时为 0（此时成本仍可由 Cost 得到）。
+     */
+    "unitCost": number;
+
+    /**
      * 阻塞性错误（如 当量与投料量都为空）
      */
     "blockingErrors": string[] | null;

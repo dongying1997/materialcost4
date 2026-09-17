@@ -73,6 +73,72 @@ func TestSingleStepBasic(t *testing.T) {
 	}
 }
 
+// TestReagentUnitCost 原料「单位成本」= 本原料成本 ÷ 本步主产物产量（元/kg 产物）。
+func TestReagentUnitCost(t *testing.T) {
+	// 底物 A 1kg（分子量 100，含量 100）→ n0 = 10 mol
+	// 试剂 B 当量 1，单价 50 元/kg，分子量 100，含量 100% → 投料 1kg → 成本 50 元
+	// 产物 P 分子量 200，重量收率 50% → 实际产量 = 1kg × 50% = 0.5 kg
+	reagents := []models.ReagentInput{
+		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)},
+		{Name: "B", MolWeight: 100, Content: 100, Equiv: f(1), Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 50}},
+	}
+	products := []models.ProductInput{
+		{Name: "P", MolWeight: 200, IsSubstrate: true, WeightYield: f(50)},
+	}
+	res := CalculateStep(models.ReactionStep{Reagents: reagents, Products: products}, nil)
+	if len(res.BlockingErrors) != 0 {
+		t.Fatalf("unexpected blocking errors: %v", res.BlockingErrors)
+	}
+
+	yield := res.Products[0].ActualYieldKg
+	if !approx(yield, 0.5, 1e-9) {
+		t.Fatalf("主产物产量 = %v, want 0.5", yield)
+	}
+
+	// 每个原料的单位成本都应等于 该原料成本 ÷ 主产物产量
+	for i, r := range res.Reagents {
+		want := r.Cost / yield
+		if !approx(r.UnitCost, want, 1e-9) {
+			t.Errorf("原料 %d 单位成本 = %v, want %v（成本 %v ÷ 产量 %v）",
+				i, r.UnitCost, want, r.Cost, yield)
+		}
+	}
+	// 具体值：B 成本 50 元 ÷ 0.5 kg = 100 元/kg
+	if !approx(res.Reagents[1].UnitCost, 100, 1e-9) {
+		t.Errorf("B 单位成本 = %v, want 100", res.Reagents[1].UnitCost)
+	}
+
+	// 与产物单位成本同一分母：各原料单位成本之和 = 步骤单位成本
+	if !approx(res.Reagents[0].UnitCost+res.Reagents[1].UnitCost, res.Products[0].UnitCost, 1e-9) {
+		t.Errorf("原料单位成本之和 %v ≠ 产物单位成本 %v",
+			res.Reagents[0].UnitCost+res.Reagents[1].UnitCost, res.Products[0].UnitCost)
+	}
+}
+
+// TestReagentUnitCostWithoutPrimaryYield 无主产物/产量为 0 时单位成本为 0，不产生 Inf/NaN。
+func TestReagentUnitCostWithoutPrimaryYield(t *testing.T) {
+	reagents := []models.ReagentInput{
+		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
+	}
+	// 没有产物 → 无产量
+	res := CalculateStep(models.ReactionStep{Reagents: reagents, Products: []models.ProductInput{}}, nil)
+	if len(res.Reagents) != 1 {
+		t.Fatalf("reagents = %d", len(res.Reagents))
+	}
+	u := res.Reagents[0].UnitCost
+	if math.IsNaN(u) || math.IsInf(u, 0) {
+		t.Errorf("单位成本应为 0 而不是 %v", u)
+	}
+	if u != 0 {
+		t.Errorf("无主产物时单位成本 = %v, want 0", u)
+	}
+	// 成本本身仍然可算
+	if res.Reagents[0].Cost != 10 {
+		t.Errorf("成本 = %v, want 10", res.Reagents[0].Cost)
+	}
+}
+
 func TestBlockingWhenNoEquivNoAmount(t *testing.T) {
 	reagents := []models.ReagentInput{
 		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)},

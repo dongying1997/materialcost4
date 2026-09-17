@@ -69,11 +69,13 @@ func CalculateStep(step models.ReactionStep, prevProduct *IntermediateProduct) *
 	}
 
 	// ---- 主产物（供下一步继承）----
+	primaryYield := 0.0
 	if !hasBlocking(res) {
 		for i := range step.Products {
 			if step.Products[i].IsSubstrate {
 				pr := res.Products[i]
 				if pr.ActualYieldKg > 0 {
+					primaryYield = pr.ActualYieldKg
 					res.PrimaryProduct = &IntermediateProduct{
 						Name:        productName(&step.Products[i]),
 						MolWeight:   step.Products[i].MolWeight,
@@ -83,6 +85,14 @@ func CalculateStep(step models.ReactionStep, prevProduct *IntermediateProduct) *
 				}
 				break
 			}
+		}
+	}
+
+	// 各原料的单位成本 = 本原料成本 ÷ 本步主产物产量（元/kg 产物）。
+	// 与产物单位成本同一分母，便于横向比较各原料对成品单位成本的贡献。
+	if primaryYield > 0 {
+		for i := range res.Reagents {
+			res.Reagents[i].UnitCost = res.Reagents[i].Cost / primaryYield
 		}
 	}
 

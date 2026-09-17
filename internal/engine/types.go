@@ -25,6 +25,9 @@ type ReagentResult struct {
 	UnitPrice float64 `json:"unitPrice"`
 	// 成本（元）= 实际投料量×单价×(1-回收率%)
 	Cost float64 `json:"cost"`
+	// 单位成本（元/kg）= 本原料成本 ÷ 本步主产物实际产量。
+	// 无主产物或产量为 0 时为 0（此时成本仍可由 Cost 得到）。
+	UnitCost float64 `json:"unitCost"`
 	// 阻塞性错误（如 当量与投料量都为空）
 	BlockingErrors []string `json:"blockingErrors"`
 	// 非阻塞警告

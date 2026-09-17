@@ -29,6 +29,8 @@ const TOTAL_WIDTH = COL_RADIO + COL_NAME_R + COL_CAS + COL_NUM * 5 + COL_RST + C
 // 输入控件铺满所在单元格
 const fullInput = { width: '100%' } as const
 
+// 未关联物料库的行在名称下拉里的哨兵值（真实物料 id 恒为正数，不会冲突）
+const UNBOUND_MATERIAL = -1
 
 /**
  * 单价单元格：可直接手动输入，也可从右侧图标下拉选物料库的历史价格。
@@ -194,17 +196,31 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
             textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>{r.name}</Tag>
         </Space>
-      ) : (
-        <Select
-          size="small" showSearch allowClear style={fullInput} placeholder="选择物料"
-          optionFilterProp="label" value={r.materialId || undefined}
-          options={materials.map(m => ({ value: m.id, label: `${m.name}${m.cas ? `（${m.cas}）` : ''}` }))}
-          onChange={(v) => {
-            if (v) { pickMaterial(r, v) }
-            else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], latestPrice: null, price: null })
-          }}
-        />
-      ),
+      ) : (() => {
+        // 未关联物料库但有名称的行（如导入的方案，导入时 materialId 会被清空）：
+        // Select 找不到匹配项就会渲染成空白的「选择物料」，名称明明在数据里却看不见。
+        // 因此把当前名称作为一个哨兵选项注入，保证名称始终可见，同时仍可下拉改选。
+        const bound = r.materialId > 0 && materials.some(m => m.id === r.materialId)
+        const unbound = !bound && !!r.name
+        const options = materials.map(m => ({ value: m.id, label: `${m.name}${m.cas ? `（${m.cas}）` : ''}` }))
+        if (unbound) options.unshift({ value: UNBOUND_MATERIAL, label: r.name })
+        const select = (
+          <Select
+            size="small" showSearch allowClear style={fullInput} placeholder="选择物料"
+            optionFilterProp="label"
+            value={bound ? r.materialId : (unbound ? UNBOUND_MATERIAL : undefined)}
+            options={options}
+            onChange={(v) => {
+              if (v === UNBOUND_MATERIAL) return // 哨兵项不可选，重新选物料请挑真实物料
+              if (v) { pickMaterial(r, v) }
+              else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], latestPrice: null, price: null })
+            }}
+          />
+        )
+        return unbound
+          ? <Tooltip title="该原料未关联物料库（来自导入的方案），计算使用方案自带数据；点此可重新关联到物料库中的物料">{select}</Tooltip>
+          : select
+      })(),
     },
     {
       title: 'CAS', width: COL_CAS, align: 'center',
@@ -258,19 +274,26 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       },
     },
     {
-      title: '成本(元)', width: COL_COST, align: 'right',
+      title: '单位成本(元/kg)', width: COL_COST, align: 'right',
       render: (_, r) => {
         const idx = step.reagents.indexOf(r)
-        const c = rr(idx)?.cost
-        const warn = rr(idx)?.warnings?.length
+        const res = rr(idx)
+        const c = res?.cost
+        const warn = res?.warnings?.length
         if (!c) return <span style={{ color: '#bbb' }}>-</span>
+        // 单位成本 = 本原料成本 ÷ 本步主产物产量（与产物表同一分母，便于横向比较）
+        const unit = res?.unitCost
         const stepPct = result && result.totalCost > 0 ? (c / result.totalCost * 100) : 0
         // 占总成本比例：本步占比 × 链式乘数（承载前续步骤成本）
         const totalPct = stepPct * totalShareMultiplier
         const isLastChain = result && result.totalCost > 0 && Math.abs(totalShareMultiplier - 1) < 1e-9
         return (
           <div style={{ textAlign: 'right', lineHeight: 1.35 }}>
-            <div style={{ color: warn ? '#faad14' : '#333', fontWeight: 500 }}>{fmtMoney(c)}</div>
+            <Tooltip title={`成本 ${fmtMoney(c)} 元 ÷ 主产物产量`}>
+              <div style={{ color: warn ? '#faad14' : '#333', fontWeight: 500 }}>
+                {unit ? fmtMoney(unit) : '-'}
+              </div>
+            </Tooltip>
             {result && result.totalCost > 0 && (
               isLastChain ? (
                 <Tooltip title="占本步成本比例">
