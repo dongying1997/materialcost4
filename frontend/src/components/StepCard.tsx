@@ -109,10 +109,16 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
       ...(drifted && latest
         ? [{ key: 'hint', disabled: true, label: `库中最新价 ${fmtMoney(latest.pricePerKg)}（当前 ${fmtMoney(current)}）` }]
         : []),
-      ...opts.map(o => ({
-        key: String(o.priceId),
-        label: `${o.date} ${o.price}${o.unit} → ${fmtMoney(o.pricePerKg)} 元/kg${o.supplier ? ' · ' + o.supplier : ''}`,
-      })),
+      ...opts.map(o => {
+        // 标签以「日期 + 单价」为主，元/kg 时不再补一段「→ 20.00 元/kg」——
+        // 换算值与原值相同，纯属重复。但 元/g 与 元/mol 的换算值反推不回去
+        // （元/mol 要除以分子量），是这条报价唯一能横向比较成本的数字，
+        // 故仅在单位确实不是 元/kg 时才补上箭头那一段。
+        const raw = `${fmtMoney(o.price)}${o.unit || ''}`
+        const needConv = (o.unit || '').trim() !== '元/kg'
+        const price = needConv ? `${raw} → ${fmtMoney(o.pricePerKg)} 元/kg` : raw
+        return { key: String(o.priceId), label: `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}` }
+      }),
     ],
     onClick: ({ key }: { key: string }) => {
       const o = opts.find(x => String(x.priceId) === key)
