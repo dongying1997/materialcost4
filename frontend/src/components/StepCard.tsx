@@ -72,11 +72,10 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-      <Tooltip title={drifted ? driftMsg : sourceMsg}>
+    <Tooltip title={drifted ? driftMsg : sourceMsg}>
       <InputNumber
         size="small"
-        style={{ flex: 1, minWidth: 0 }}
+        style={{ width: '100%' }}
         min={0}
         step={0.01}
         controls={false}
@@ -88,17 +87,31 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
           // 手动改单价视为自定义报价：保留原有供应商/日期信息，仅换数值
           onChange({ ...(row.price || emptyPrice()), unitPriceYuanPerKg: n, price: n, unit: '元/kg' })
         }}
+        suffix={
+          <Space size={2}>
+            {drifted && (
+              <Tooltip title={driftMsg}>
+                <WarningOutlined style={{ color: '#faad14', fontSize: 13 }} />
+              </Tooltip>
+            )}
+            <Tooltip title={opts.length ? '从物料库的历史价格中选择' : '该物料在库中没有价格记录'}>
+              <Dropdown
+                trigger={['click']}
+                disabled={opts.length === 0}
+                menu={historyMenu}
+                placement="bottomRight"
+              >
+                <HistoryOutlined style={{
+                  fontSize: 13,
+                  color: opts.length ? '#1677ff' : '#d9d9d9',
+                  cursor: opts.length ? 'pointer' : 'not-allowed',
+                }} />
+              </Dropdown>
+            </Tooltip>
+          </Space>
+        }
       />
-      {drifted && <Tooltip title={driftMsg}><WarningOutlined style={{ color: '#faad14', fontSize: 12 }} /></Tooltip>}
-      {opts.length > 0 && (
-        <Tooltip title="从物料库的历史价格中选择">
-          <Dropdown trigger={['click']} menu={historyMenu} placement="bottomRight">
-            <HistoryOutlined style={{ fontSize: 12, color: '#1677ff', cursor: 'pointer' }} />
-          </Dropdown>
-        </Tooltip>
-      )}
-      </Tooltip>
-    </div>
+    </Tooltip>
   )
 }
 
