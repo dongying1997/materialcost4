@@ -7,8 +7,8 @@ package engine
 type IntermediateProduct struct {
 	Name        string  `json:"name"`
 	MolWeight   float64 `json:"molWeight"`
-	UnitCost    float64 `json:"unitCost"`     // 单位成本（元/kg）
-	ActualYield float64 `json:"actualYield"`  // 实际产量（kg）
+	UnitCost    float64 `json:"unitCost"`    // 单位成本（元/kg）
+	ActualYield float64 `json:"actualYield"` // 实际产量（kg）
 }
 
 // ReagentResult 单个原料的计算结果。

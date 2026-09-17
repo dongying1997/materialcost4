@@ -119,15 +119,15 @@ func (s *ReactionService) enrichSteps(steps []models.ReactionStep) ([]models.Rea
 
 // MaterialPriceOption 物料可选价格下拉项。
 type MaterialPriceOption struct {
-	PriceID     int64   `json:"priceId"`
-	MaterialID  int64   `json:"materialId"`
-	Price       float64 `json:"price"`
-	Unit        string  `json:"unit"`
-	PricePerKg  float64 `json:"pricePerKg"`
-	Supplier    string  `json:"supplier"`
-	Date        string  `json:"date"`
-	Spec        string  `json:"spec"`
-	Content     float64 `json:"content"`
+	PriceID    int64   `json:"priceId"`
+	MaterialID int64   `json:"materialId"`
+	Price      float64 `json:"price"`
+	Unit       string  `json:"unit"`
+	PricePerKg float64 `json:"pricePerKg"`
+	Supplier   string  `json:"supplier"`
+	Date       string  `json:"date"`
+	Spec       string  `json:"spec"`
+	Content    float64 `json:"content"`
 }
 
 // PriceOptionsForMaterial 返回某物料的价格选项（供前端下拉选择）。
@@ -203,10 +203,10 @@ func (s *ReactionService) DeleteScheme(id int64) error {
 
 // SchemeExportFile 方案导出文件：JSON 数组，含导出信息字段，便于识别文件格式。
 type SchemeExportFile struct {
-	Version   int              `json:"version"`
-	App       string           `json:"app"`
-	ExportedAt string          `json:"exportedAt"`
-	Schemes   []*models.Scheme `json:"schemes"`
+	Version    int              `json:"version"`
+	App        string           `json:"app"`
+	ExportedAt string           `json:"exportedAt"`
+	Schemes    []*models.Scheme `json:"schemes"`
 }
 
 // ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
