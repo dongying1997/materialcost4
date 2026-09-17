@@ -117,6 +117,11 @@ func NowSQL() string {
 }
 
 // ParseTime 解析数据库中存储的时间字符串。
+//
+// 库里的时间字符串都是 NowSQL() 按本地时区写入的（不带时区后缀），
+// 必须用 time.ParseInLocation 按本地时区解析。若用 time.Parse，得到的是
+// UTC 时间，前端 new Date() 会再按本地时区渲染一次，等于凭空加了时差
+// （例如本地的 20:45 被显示成次日 04:45）。
 func ParseTime(s string) (time.Time, error) {
-	return time.Parse("2006-01-02 15:04:05", s)
+	return time.ParseInLocation("2006-01-02 15:04:05", s, time.Local)
 }

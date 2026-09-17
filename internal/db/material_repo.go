@@ -273,9 +273,11 @@ func (r *MaterialRepo) GetByName(name string) (*models.Material, error) {
 	return m, err
 }
 
+// parseDate 解析价格日期。与 ParseTime 同理，必须按本地时区解析，
+// 否则前端 new Date() 会把它当成 UTC 再渲染一次，日期可能整体偏一天。
 func parseDate(s string) (time.Time, error) {
 	if s == "" {
 		return time.Time{}, nil
 	}
-	return time.Parse("2006-01-02", s)
+	return time.ParseInLocation("2006-01-02", s, time.Local)
 }
