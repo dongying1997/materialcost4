@@ -291,7 +291,7 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 		materialName := get("物料名称")
 		if materialName == "" {
 			result.Skipped++
-			result.Errors = append(result.Errors, rowStr+"：缺少 CAS 号，已跳过")
+			result.Errors = append(result.Errors, rowStr+"：缺少物料名称，已跳过")
 			continue
 		}
 

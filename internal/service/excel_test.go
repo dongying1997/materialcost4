@@ -47,6 +47,12 @@ func TestExcelImport(t *testing.T) {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 5)
 		f.SetCellValue(sheet, cell, v)
 	}
+	// 第六行：第二条无 CAS 物料，同样应导入（空 CAS 不参与唯一约束）
+	row6 := []any{"无CAS物料2", "", "", "", "", "", "", "", "", "", ""}
+	for i, v := range row6 {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 6)
+		f.SetCellValue(sheet, cell, v)
+	}
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		t.Fatal(err)
@@ -56,8 +62,11 @@ func TestExcelImport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}
-	if res.MaterialsImported != 4 {
-		t.Errorf("materials imported = %d, want 4", res.MaterialsImported)
+	if res.MaterialsImported != 5 {
+		t.Errorf("materials imported = %d, want 5", res.MaterialsImported)
+	}
+	if len(res.Errors) != 0 {
+		t.Errorf("import errors = %v, want none", res.Errors)
 	}
 	if res.PricesImported != 3 {
 		t.Errorf("prices imported = %d, want 3", res.PricesImported)
@@ -90,9 +99,16 @@ func TestExcelImport(t *testing.T) {
 		t.Errorf("serial date = %v, want year %d", prices2[0].Date, expect.Year())
 	}
 
-	// 缺少 CAS 的物料也已入库（CAS 为空，不与其他物料冲突）
+	// 缺少 CAS 的物料也已入库，且允许多条（CAS 为空不参与唯一约束）
+	var noCASCount int
+	if err := d.QueryRow(`SELECT COUNT(*) FROM materials WHERE cas = ''`).Scan(&noCASCount); err != nil {
+		t.Fatalf("query no-CAS materials: %v", err)
+	}
+	if noCASCount != 2 {
+		t.Errorf("no-CAS material count = %d, want 2", noCASCount)
+	}
 	var noCASName string
-	if err := d.QueryRow(`SELECT name FROM materials WHERE cas = ''`).Scan(&noCASName); err != nil {
+	if err := d.QueryRow(`SELECT name FROM materials WHERE cas = '' ORDER BY name LIMIT 1`).Scan(&noCASName); err != nil {
 		t.Fatalf("query no-CAS material: %v", err)
 	}
 	if noCASName != "无CAS物料" {

@@ -10,6 +10,8 @@ frontend/node_modules
 !build/
 
 # 构建产物与按机器生成的中间文件
+# 仓库根目录下 wails3 build / go build 直接产出的可执行文件
+/materialcost4
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 build/linux/*.desktop

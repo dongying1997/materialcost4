@@ -3,9 +3,11 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -40,6 +42,9 @@ func Open(path string) (*DB, error) {
 
 // migrate 建表。
 func (d *DB) migrate() error {
+	if err := d.rebuildCASIndex(); err != nil {
+		return err
+	}
 	stmts := []string{
 		`PRAGMA foreign_keys = ON;`,
 		`CREATE TABLE IF NOT EXISTS materials (
@@ -55,7 +60,8 @@ func (d *DB) migrate() error {
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		);`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_materials_cas ON materials(cas);`,
+		// 部分索引：CAS 为选填，空值不参与唯一约束（否则多条无 CAS 物料会互相冲突）。
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_materials_cas ON materials(cas) WHERE cas <> '';`,
 		`CREATE INDEX IF NOT EXISTS idx_materials_name ON materials(name);`,
 		`CREATE TABLE IF NOT EXISTS prices (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,6 +91,24 @@ func (d *DB) migrate() error {
 		}
 	}
 	return nil
+}
+
+// rebuildCASIndex 删除旧的无条件唯一索引，交由 migrate 重建为部分索引。
+// 旧索引会约束空字符串 CAS，导致多条无 CAS 物料互相冲突。
+func (d *DB) rebuildCASIndex() error {
+	var def *string
+	err := d.QueryRow(`SELECT sql FROM sqlite_master WHERE type='index' AND name='idx_materials_cas'`).Scan(&def)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil // 尚未建过该索引
+	}
+	if err != nil {
+		return err
+	}
+	if def != nil && strings.Contains(strings.ToUpper(*def), "WHERE") {
+		return nil // 已是部分索引
+	}
+	_, err = d.Exec(`DROP INDEX IF EXISTS idx_materials_cas`)
+	return err
 }
 
 // NowSQL 返回存储用的时间字符串（本地时区）。
