@@ -15,7 +15,6 @@ type MaterialRepo struct {
 
 func NewMaterialRepo(db *DB) *MaterialRepo { return &MaterialRepo{db: db} }
 
-
 // scanMaterial 辅助函数 将sql结果解析到Material结构体
 func scanMaterial(r *sql.Row) (*models.Material, error) {
 	m := &models.Material{}
@@ -80,14 +79,15 @@ func (r *MaterialRepo) Get(id int64) (*models.Material, error) {
 	return scanMaterial(row)
 }
 
-// List 搜索物料：按 编码/名称/CAS/化学式 模糊匹配。
+// List 搜索物料：按 编码/名称/CAS/化学式/备注 模糊匹配。
+// 备注也参与匹配，是为了让别名可搜——导入时同一物质的其它写法会记在备注里。
 func (r *MaterialRepo) List(keyword string) ([]*models.Material, error) {
 	q := `SELECT id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at FROM materials`
 	var args []any
 	if k := strings.TrimSpace(keyword); k != "" {
-		q += ` WHERE code LIKE ? OR name LIKE ? OR cas LIKE ? OR formula LIKE ?`
+		q += ` WHERE code LIKE ? OR name LIKE ? OR cas LIKE ? OR formula LIKE ? OR note LIKE ?`
 		like := "%" + k + "%"
-		args = []any{like, like, like, like}
+		args = []any{like, like, like, like, like}
 	}
 	q += ` ORDER BY name`
 	rows, err := r.db.Query(q, args...)
@@ -152,7 +152,7 @@ func (r *MaterialRepo) DeletePrice(id int64) error {
 	return err
 }
 
-// ListPrices 按条件查询价格：供应商/化合物名称/CAS。
+// ListPrices 按条件查询价格：供应商/化合物名称/CAS/物料备注（含别名）。
 func (r *MaterialRepo) ListPrices(materialID int64, keyword string) ([]*models.Price, error) {
 	q := `SELECT p.id,p.material_id,p.price,p.unit,p.supplier,p.date,p.spec,p.content,p.note,p.created_at
 		FROM prices p JOIN materials m ON m.id = p.material_id WHERE 1=1`
@@ -162,9 +162,9 @@ func (r *MaterialRepo) ListPrices(materialID int64, keyword string) ([]*models.P
 		args = append(args, materialID)
 	}
 	if k := strings.TrimSpace(keyword); k != "" {
-		q += ` AND (p.supplier LIKE ? OR m.name LIKE ? OR m.cas LIKE ?)`
+		q += ` AND (p.supplier LIKE ? OR m.name LIKE ? OR m.cas LIKE ? OR m.note LIKE ?)`
 		like := "%" + k + "%"
-		args = append(args, like, like, like)
+		args = append(args, like, like, like, like)
 	}
 	q += ` ORDER BY p.date DESC, p.id DESC`
 	rows, err := r.db.Query(q, args...)

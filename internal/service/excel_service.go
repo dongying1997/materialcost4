@@ -31,16 +31,16 @@ var templateHeaders = []string{"物料名称", "CAS号", "化学式", "分子量
 // headerAliases 表头别名容错匹配。
 var headerAliases = map[string][]string{
 	"物料名称": {"物料名称", "物料", "名称", "品名", "物料名"},
-	"CAS号":   {"cas号", "cas", "cas no", "cas no."},
-	"化学式":   {"化学式", "分子式", "化学结构式"},
-	"分子量":   {"分子量", "mol weight", "mw", "分子量(g/mol)"},
-	"价格":     {"价格", "单价", "价格(元)", "price"},
+	"CAS号": {"cas号", "cas", "cas no", "cas no."},
+	"化学式":  {"化学式", "分子式", "化学结构式"},
+	"分子量":  {"分子量", "mol weight", "mw", "分子量(g/mol)"},
+	"价格":   {"价格", "单价", "价格(元)", "price"},
 	"价格单位": {"价格单位", "单位", "price unit", "币种单位"},
-	"供应商":   {"供应商", "厂商", "supplier", "货商"},
-	"日期":     {"日期", "时间", "date", "报价日期", "价格日期"},
-	"规格":     {"规格", "spec", "规格型号"},
-	"含量":     {"含量", "纯度", "含量%", "assay", "纯度%"},
-	"备注":     {"备注", "note", "注释", "说明"},
+	"供应商":  {"供应商", "厂商", "supplier", "货商"},
+	"日期":   {"日期", "时间", "date", "报价日期", "价格日期"},
+	"规格":   {"规格", "spec", "规格型号"},
+	"含量":   {"含量", "纯度", "含量%", "assay", "纯度%"},
+	"备注":   {"备注", "note", "注释", "说明"},
 }
 
 // normalizeHeader 将表头标准化（小写、去空格、去括号）。
@@ -157,8 +157,8 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 		// 价格记录：最新模式取单条，全部模式取所有（降序）
 		type priceRow struct {
 			price, unit, supplier, spec string
-			date                         string
-			content                      float64
+			date                        string
+			content                     float64
 		}
 		var prices []priceRow
 		if allPrices {
@@ -235,6 +235,26 @@ func (s *ExcelService) ExportMaterialsToFile(allPrices bool) (string, error) {
 	return path, nil
 }
 
+// aliasPrefix 备注里别名段的标记，便于重复导入时不重复追加。
+const aliasPrefix = "别名："
+
+// appendAlias 把别名追加到备注；已记录过的别名不重复追加。
+// 备注里可能已有用户自己写的内容，因此用「；」分隔而不是覆盖。
+func appendAlias(note, alias string) string {
+	if alias == "" {
+		return note
+	}
+	note = strings.TrimSpace(note)
+	if strings.Contains(note, aliasPrefix+alias) {
+		return note // 该别名已记录过
+	}
+	entry := aliasPrefix + alias
+	if note == "" {
+		return entry
+	}
+	return note + "；" + entry
+}
+
 // numOrEmpty 将 0 值数字转为空字符串（导出更清爽）。
 func numOrEmpty(v float64) any {
 	if v == 0 {
@@ -305,11 +325,33 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			Note:      get("备注"),
 		}
 
-		// 按 物料名称 导入物料：已有则更新基础字段，无则新增
-		existing, err := s.repo.GetByName(materialName)
+		// 匹配库中已有物料：先按名称，再按 CAS。
+		// 两者都要查——同一物质常以不同写法分别存在（如「对苯醌」/「1,4-苯醌」、
+		// 「DBU」/「1,8-二氮杂双环[5.4.0]十一碳-7-烯」各存了一条），只按名称匹配
+		// 会把别名行误判成新物料，进而撞上 CAS 唯一索引。
+		byName, err := s.repo.GetByName(materialName)
 		if err != nil {
 			result.Errors = append(result.Errors, rowStr+"：查询物料失败 "+err.Error())
 			continue
+		}
+		var byCAS *models.Material
+		if material.CAS != "" {
+			if byCAS, err = s.repo.GetByCAS(material.CAS); err != nil {
+				result.Errors = append(result.Errors, rowStr+"：查询物料失败 "+err.Error())
+				continue
+			}
+		}
+		// 与 Excel 行 CAS 一致的记录才是同一物质，优先用它，
+		// 否则同一物质的两条记录会各自被补上对方的 CAS 而互相冲突。
+		existing := byCAS
+		if existing == nil {
+			existing = byName
+		}
+		if existing != nil {
+			// 库中名称与 Excel 不同 → 是别名，记到备注（保留库中名称）
+			if existing.Name != materialName && (byCAS != nil || material.CAS != "") {
+				existing.Note = appendAlias(existing.Note, materialName)
+			}
 		}
 		if existing == nil {
 			id, err := s.repo.Insert(material)
@@ -320,8 +362,7 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			material.ID = id
 			result.MaterialsImported++
 		} else {
-			material.ID = existing.ID
-			// 更新CAS/化学式/分子量等字段（Name 不变）
+			// 更新CAS/化学式/分子量等字段（Name 保持不变，沿用库中的名称）
 			if material.CAS != "" {
 				existing.CAS = material.CAS
 			}
@@ -333,6 +374,11 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			}
 			if material.Content > 0 {
 				existing.Content = material.Content
+			}
+			// 仅当这行就是该物料的正式名称时才用 Excel 的备注，
+			// 否则会把上一步写进去的别名覆盖掉
+			if existing.Name == materialName && material.Note != "" {
+				existing.Note = material.Note
 			}
 			if err := s.repo.Update(existing); err != nil {
 				result.Errors = append(result.Errors, rowStr+"：更新物料失败 "+err.Error())
@@ -383,8 +429,6 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 
 	return result, nil
 }
-
-
 
 // parseDateFlexible 解析日期：支持字符串（2026-08-25）、Excel 序列号，
 // 以及被单元格格式渲染成字符串的日期（如 08-25-26）——这类按原始序列号回退解析。
@@ -476,5 +520,3 @@ func parseFloatE(s string) (float64, error) {
 	}
 	return v, nil
 }
-
-
