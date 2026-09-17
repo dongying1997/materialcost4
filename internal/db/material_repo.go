@@ -15,6 +15,8 @@ type MaterialRepo struct {
 
 func NewMaterialRepo(db *DB) *MaterialRepo { return &MaterialRepo{db: db} }
 
+
+// scanMaterial 辅助函数 将sql结果解析到Material结构体
 func scanMaterial(r *sql.Row) (*models.Material, error) {
 	m := &models.Material{}
 	var created, updated string
@@ -27,6 +29,7 @@ func scanMaterial(r *sql.Row) (*models.Material, error) {
 	return m, nil
 }
 
+// scanMaterials 辅助函数 将sql结果(复数)解析到Material结构体列表
 func (r *MaterialRepo) scanMaterials(rows *sql.Rows) ([]*models.Material, error) {
 	list := []*models.Material{}
 	for rows.Next() {
@@ -221,6 +224,16 @@ func (r *MaterialRepo) FindPrice(id int64) (*models.Price, error) {
 // GetByCAS 按 CAS 精确查找物料。
 func (r *MaterialRepo) GetByCAS(cas string) (*models.Material, error) {
 	row := r.db.QueryRow(`SELECT id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at FROM materials WHERE cas=?`, cas)
+	m, err := scanMaterial(row)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return m, err
+}
+
+// GetByCAS 按 CAS 精确查找物料。
+func (r *MaterialRepo) GetByName(name string) (*models.Material, error) {
+	row := r.db.QueryRow(`SELECT id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at FROM materials WHERE name=?`, name)
 	m, err := scanMaterial(row)
 	if err == sql.ErrNoRows {
 		return nil, nil

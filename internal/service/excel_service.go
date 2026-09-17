@@ -287,26 +287,26 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			}
 			return ""
 		}
-		// 不再将CAS号作为导入数据时必须的字段
-		cas := get("CAS号")
-		// if cas == "" {
-		// 	result.Skipped++
-		// 	result.Errors = append(result.Errors, rowStr+"：缺少 CAS 号，已跳过")
-		// 	continue
-		// }
+		// “物料名称”作为必须字段
+		materialName := get("物料名称")
+		if materialName == "" {
+			result.Skipped++
+			result.Errors = append(result.Errors, rowStr+"：缺少 CAS 号，已跳过")
+			continue
+		}
 
 		// 解析物料字段
 		material := &models.Material{
 			Name:      get("物料名称"),
-			CAS:       cas,
+			CAS:       get("CAS号"),
 			Formula:   get("化学式"),
 			MolWeight: parseFloat(get("分子量")),
 			Content:   parseFloat(get("含量")),
 			Note:      get("备注"),
 		}
 
-		// 按 CAS 导入物料：已有则更新基础字段，无则新增
-		existing, err := s.repo.GetByCAS(cas)
+		// 按 物料名称 导入物料：已有则更新基础字段，无则新增
+		existing, err := s.repo.GetByName(materialName)
 		if err != nil {
 			result.Errors = append(result.Errors, rowStr+"：查询物料失败 "+err.Error())
 			continue
@@ -321,9 +321,9 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			result.MaterialsImported++
 		} else {
 			material.ID = existing.ID
-			// 更新名称/化学式/分子量等字段（CAS 不变）
-			if material.Name != "" {
-				existing.Name = material.Name
+			// 更新CAS/化学式/分子量等字段（Name 不变）
+			if material.CAS != "" {
+				existing.CAS = material.CAS
 			}
 			if material.Formula != "" {
 				existing.Formula = material.Formula

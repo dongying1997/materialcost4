@@ -41,7 +41,7 @@ func TestExcelImport(t *testing.T) {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 4)
 		f.SetCellValue(sheet, cell, v)
 	}
-	// 第五行：缺少 CAS → 跳过
+	// 第五行：缺少 CAS 也应导入（CAS 不是必填字段）
 	row5 := []any{"无CAS物料", "", "", "", "", "", "", "", "", "", ""}
 	for i, v := range row5 {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 5)
@@ -56,14 +56,14 @@ func TestExcelImport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}
-	if res.MaterialsImported != 3 {
-		t.Errorf("materials imported = %d, want 3", res.MaterialsImported)
+	if res.MaterialsImported != 4 {
+		t.Errorf("materials imported = %d, want 4", res.MaterialsImported)
 	}
 	if res.PricesImported != 3 {
 		t.Errorf("prices imported = %d, want 3", res.PricesImported)
 	}
-	if res.Skipped != 1 {
-		t.Errorf("skipped = %d, want 1", res.Skipped)
+	if res.Skipped != 0 {
+		t.Errorf("skipped = %d, want 0", res.Skipped)
 	}
 
 	// 验证物料与价格入库
@@ -88,6 +88,15 @@ func TestExcelImport(t *testing.T) {
 	expect := time.Date(1899, 12, 30, 0, 0, 0, 0, time.Local).AddDate(0, 0, 46000)
 	if prices2[0].Date.Year() != expect.Year() {
 		t.Errorf("serial date = %v, want year %d", prices2[0].Date, expect.Year())
+	}
+
+	// 缺少 CAS 的物料也已入库（CAS 为空，不与其他物料冲突）
+	var noCASName string
+	if err := d.QueryRow(`SELECT name FROM materials WHERE cas = ''`).Scan(&noCASName); err != nil {
+		t.Fatalf("query no-CAS material: %v", err)
+	}
+	if noCASName != "无CAS物料" {
+		t.Errorf("no-CAS material name = %q, want 无CAS物料", noCASName)
 	}
 
 	// 真实日期单元格验证（m/d/yy 渲染，raw 回退）
