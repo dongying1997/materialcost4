@@ -60,6 +60,11 @@ func (s *MaterialService) DeleteMaterial(id int64) error {
 	return s.repo.Delete(id)
 }
 
+// ClearAllMaterials 清空物料库（物料与价格），方案数据不受影响。不可恢复。
+func (s *MaterialService) ClearAllMaterials() (*db.ClearAllResult, error) {
+	return s.repo.ClearAll()
+}
+
 // ListPrices 价格列表。
 func (s *MaterialService) ListPrices(materialID int64, keyword string) ([]*models.Price, error) {
 	return s.repo.ListPrices(materialID, keyword)

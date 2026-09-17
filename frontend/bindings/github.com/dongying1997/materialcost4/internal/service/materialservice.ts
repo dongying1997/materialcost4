@@ -12,7 +12,17 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as db$0 from "../db/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as models$0 from "../models/models.js";
+
+/**
+ * ClearAllMaterials 清空物料库（物料与价格），方案数据不受影响。不可恢复。
+ */
+export function ClearAllMaterials(): $CancellablePromise<db$0.ClearAllResult | null> {
+    return $Call.ByID(4076812742);
+}
 
 /**
  * DeleteMaterial 删除物料（级联删除价格）。

@@ -12,6 +12,7 @@ export interface MaterialsApi {
   importing: boolean
   exporting: boolean
   exportOpen: boolean
+  clearOpen: boolean
   form: ReturnType<typeof Form.useForm>[0]
   editOpen: boolean
   editing: Material | null
@@ -28,6 +29,9 @@ export interface MaterialsApi {
   openExport: () => void
   closeExport: () => void
   doExport: (allPrices: boolean) => Promise<void>
+  openClear: () => void
+  closeClear: () => void
+  doClear: () => Promise<void>
   openPrice: (m: MaterialWithPrice | null) => void
 }
 
@@ -42,6 +46,7 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [clearOpen, setClearOpen] = useState(false)
   const [form] = Form.useForm()
 
   const load = useCallback(async (kw = keyword) => {
@@ -157,13 +162,29 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const openExport = () => setExportOpen(true)
   const closeExport = () => setExportOpen(false)
 
+  const openClear = () => setClearOpen(true)
+  const closeClear = () => setClearOpen(false)
+
+  // 清空物料库（不可恢复，确认交互在 ClearMaterialsModal 里）
+  const doClear = async () => {
+    try {
+      const res = await MaterialService.ClearAllMaterials()
+      messageApi.success(`已清空 ${res?.materialsDeleted ?? 0} 条物料`)
+      setClearOpen(false)
+      setDrawerMaterial(null) // 抽屉指向的物料已不存在
+      load()
+    } catch (e) {
+      messageApi.error(String(e))
+    }
+  }
+
   const openPrice = (m: MaterialWithPrice | null) => setDrawerMaterial(m)
 
   return {
-    list, loading, importing, exporting, exportOpen, form,
+    list, loading, importing, exporting, exportOpen, clearOpen, form,
     editOpen, editing, drawerMaterial,
     search, refresh, openCreate, openEdit, closeEdit,
     saveMaterial, deleteMaterial, onImport, downloadTemplate,
-    openExport, closeExport, doExport, openPrice,
+    openExport, closeExport, doExport, openClear, closeClear, doClear, openPrice,
   }
 }

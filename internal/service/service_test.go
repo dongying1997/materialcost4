@@ -97,6 +97,73 @@ func TestMaterialCRUD(t *testing.T) {
 	}
 }
 
+func TestClearAllMaterials(t *testing.T) {
+	d := newTestDB(t)
+	repo := db.NewMaterialRepo(d)
+	svc := NewMaterialService(repo)
+
+	// 两个物料，一个带价格；另存一个方案，清空物料库不应影响它
+	m1 := &models.Material{Name: "甲醇", CAS: "67-56-1"}
+	id1, err := repo.Insert(m1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.Insert(&models.Material{Name: "乙醇", CAS: "64-17-5"}); err != nil {
+		t.Fatal(err)
+	}
+	day := time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local)
+	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 3.5, Unit: "元/kg", Date: day}); err != nil {
+		t.Fatal(err)
+	}
+	schemeSvc := NewReactionService(repo, db.NewSchemeRepo(d))
+	scheme, err := schemeSvc.SaveScheme(&models.Scheme{Name: "保留的方案", Steps: []models.ReactionStep{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := svc.ClearAllMaterials()
+	if err != nil {
+		t.Fatalf("clear all: %v", err)
+	}
+	if res.MaterialsDeleted != 2 || res.PricesDeleted != 1 {
+		t.Errorf("deleted materials=%d prices=%d, want 2/1", res.MaterialsDeleted, res.PricesDeleted)
+	}
+
+	// 两张表都空了
+	for _, table := range []string{"materials", "prices"} {
+		var n int
+		if err := d.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 0 {
+			t.Errorf("%s 还有 %d 条, want 0", table, n)
+		}
+	}
+
+	// 方案不受影响
+	loaded, err := schemeSvc.GetScheme(scheme.ID)
+	if err != nil || loaded == nil {
+		t.Fatalf("scheme 被清掉了: %v", err)
+	}
+	if loaded.Name != "保留的方案" {
+		t.Errorf("scheme name = %q", loaded.Name)
+	}
+
+	// 清空后仍可正常新增（清空不应破坏表结构或索引）
+	if _, err := svc.SaveMaterial(&models.Material{Name: "苯", CAS: "71-43-2"}); err != nil {
+		t.Fatalf("clear 后新增失败: %v", err)
+	}
+
+	// 空库上重复清空是幂等的
+	res, err = svc.ClearAllMaterials()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.MaterialsDeleted != 1 || res.PricesDeleted != 0 {
+		t.Errorf("第二次 clear: materials=%d prices=%d, want 1/0", res.MaterialsDeleted, res.PricesDeleted)
+	}
+}
+
 func TestSchemeSaveLoad(t *testing.T) {
 	d := newTestDB(t)
 	repo := db.NewMaterialRepo(d)

@@ -73,6 +73,38 @@ func (r *MaterialRepo) Delete(id int64) error {
 	return err
 }
 
+// ClearAllResult 清空物料库的结果（删除条数）。
+type ClearAllResult struct {
+	MaterialsDeleted int64 `json:"materialsDeleted"`
+	PricesDeleted    int64 `json:"pricesDeleted"`
+}
+
+// ClearAll 清空全部物料与价格记录，返回删除条数。方案数据不受影响。
+// 价格不单独删除——prices.material_id 上带 ON DELETE CASCADE，随物料一起走。
+func (r *MaterialRepo) ClearAll() (*ClearAllResult, error) {
+	// 统计与删除放在同一事务里，避免返回的条数与实际删除的不一致。
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback() //nolint:errcheck // 已提交时回滚是空操作
+
+	res := &ClearAllResult{}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM materials`).Scan(&res.MaterialsDeleted); err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM prices`).Scan(&res.PricesDeleted); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(`DELETE FROM materials`); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 // Get 按 id 查询物料。
 func (r *MaterialRepo) Get(id int64) (*models.Material, error) {
 	row := r.db.QueryRow(`SELECT id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at FROM materials WHERE id=?`, id)

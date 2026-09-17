@@ -5,6 +5,7 @@ import MaterialsTable from '../components/MaterialsTable'
 import MaterialEditModal from '../components/MaterialEditModal'
 import PriceDrawer from '../components/PriceDrawer'
 import ExportModal from '../components/ExportModal'
+import ClearMaterialsModal from '../components/ClearMaterialsModal'
 
 /** 物料库页：组合工具栏、列表、编辑弹窗与价格抽屉 */
 function MaterialsPage() {
@@ -22,6 +23,7 @@ function MaterialsPage() {
         onImport={m.onImport}
         onDownloadTemplate={m.downloadTemplate}
         onExport={m.openExport}
+        onClear={m.openClear}
       />
       <div style={{ minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <MaterialsTable
@@ -49,6 +51,11 @@ function MaterialsPage() {
         open={m.exportOpen}
         onCancel={m.closeExport}
         onExport={m.doExport}
+      />
+      <ClearMaterialsModal
+        open={m.clearOpen}
+        onCancel={m.closeClear}
+        onConfirm={m.doClear}
       />
     </div>
   )
