@@ -287,12 +287,13 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			}
 			return ""
 		}
+		// 不再将CAS号作为导入数据时必须的字段
 		cas := get("CAS号")
-		if cas == "" {
-			result.Skipped++
-			result.Errors = append(result.Errors, rowStr+"：缺少 CAS 号，已跳过")
-			continue
-		}
+		// if cas == "" {
+		// 	result.Skipped++
+		// 	result.Errors = append(result.Errors, rowStr+"：缺少 CAS 号，已跳过")
+		// 	continue
+		// }
 
 		// 解析物料字段
 		material := &models.Material{
