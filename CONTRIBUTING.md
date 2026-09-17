@@ -98,11 +98,24 @@ docs(all): 重写 README 为开源版
 
 发布由 [`.github/workflows/release.yml`](.github/workflows/release.yml) 在推送 `v*` tag 时自动完成，无需手工构建。
 
-**版本号只有一个来源：[`build/config.yml`](build/config.yml) 的 `info.version`。** 它会被写进 macOS 的 `Info.plist`、Windows 的 `info.json` 与 Linux 的 `nfpm.yaml`。修改后需同步生成物：
+**版本号只有一个来源：[`build/config.yml`](build/config.yml) 的 `info.version`。** 它会被写进 macOS 的 `Info.plist`、Windows 的 `info.json` 与 Linux 的 `nfpm.yaml`。
+
+**改完必须跑生成器同步：**
 
 ```bash
 wails3 task common:update:build-assets
 ```
+
+否则 CI 会用仓库里**已提交的**那份旧资源构建——三个平台的发布任务都不跑这个生成器（见 `.github/workflows/release.yml`），只改 `config.yml` 的话，安装包里的版本号会原地不动。v0.2.0 就踩过这个坑：Release 标着 v0.2.0，而 macOS 的 `CFBundleShortVersionString`、Windows 的 `INFO_PRODUCTVERSION`、Linux 包的 `Version:` 全是 `0.1.0`。
+
+**跑完生成器务必 `git diff` 检查 `build/linux/nfpm/nfpm.yaml`。** 该文件既是生成物又含手工定制，生成器会把它整个按模板重写，把两行定制冲掉：
+
+| 字段 | 生成器会写回 | 应当保持 |
+|------|-------------|---------|
+| `homepage` | `https://wails.io` | 本仓库地址 |
+| `license` | `MIT` | `Proprietary`（见 [README 的「许可」](README.md#许可)，本项目尚未添加开源许可证，声明 MIT 属虚假许可）|
+
+其余生成物（各 `Info.plist`、`info.json`、`wails_tools.nsh`、`wails.exe.manifest`）纯由模板生成，只有版本号会变，可以直接接受。
 
 **发布步骤：**
 
