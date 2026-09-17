@@ -2,13 +2,12 @@
 
 一个基于 **Wails v3 + React** 的跨平台桌面应用，用于化学反应的物料成本核算、物料与价格库管理，并支持从 Excel 批量导入物料价格。
 
-<!-- TODO: 截图占位 —— 请将截图放入 docs/screenshots/ 后取消注释
 <p align="center">
   <img src="docs/screenshots/materials.png" width="32%" alt="物料库" />
   <img src="docs/screenshots/reaction.png"  width="32%" alt="反应计算" />
   <img src="docs/screenshots/schemes.png"   width="32%" alt="方案管理" />
 </p>
--->
+
 
 ![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
 ![Wails](https://img.shields.io/badge/Wails-v3.0.0--beta.12-DF0000?logo=wails&logoColor=white)

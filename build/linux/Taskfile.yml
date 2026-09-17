@@ -38,6 +38,18 @@ tasks:
       HAS_CC:
         sh: 'wails3 tool has "gcc|clang"'
 
+  # 同 darwin 的 prepare:output：`go build -o` 拒绝覆盖「非空、且不是目标文件」
+  # 的已有文件，直接报 build output ... already exists and is not an object file。
+  # 详见 build/darwin/Taskfile.yml 的同类任务注释。
+  #
+  # 不用 precondition + test -f：文件不存在时 precondition 不满足会把整个
+  # build 判为 ERROR precondition not met。无条件 rm -f 对不存在的路径静默成功。
+  prepare:output:
+    summary: Removes a stale output that would block `go build -o`
+    internal: true
+    cmds:
+      - rm -f "{{.OUTPUT}}"
+
   build:native:
     summary: Builds the application natively on Linux
     internal: true
@@ -53,6 +65,9 @@ tasks:
             ref: .DEV
       - task: common:generate:icons
       - task: generate:dotdesktop
+      - task: prepare:output
+        vars:
+          OUTPUT: '{{.OUTPUT}}'
     preconditions:
       - sh: '{{if eq .OBFUSCATED "true"}}command -v garble >/dev/null 2>&1{{else}}true{{end}}'
         msg: "garble is required for obfuscated builds. Install it with: go install mvdan.cc/garble@v0.16.0 (requires Go 1.24+). See https://github.com/burrowers/garble/releases for version/toolchain compatibility."
