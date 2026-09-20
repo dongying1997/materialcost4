@@ -120,8 +120,9 @@ export function round2(v: number): number {
 
 /**
  * 把计算结果回填到编辑行中的空缺字段（仅当整条链无阻塞错误时调用）。
- * 原料：缺实际投料量 → 用推算值；产物：缺收率/实际产量 → 用推算值。
- * 回填值统一修约到两位小数。返回新的步骤数组；若无任何空缺则原样返回。
+ * 原料：缺当量 → 用实际投料量反推当量；缺实际投料量 → 用当量推算值。
+ * 产物：缺收率/实际产量 → 用推算值。当量为比值、保留三位小数，其余回填值修约到两位小数。
+ * 返回新的步骤数组；若无任何空缺则原样返回。
  */
 export function backfillFromResult(steps: StepRow[], result: MultiStepResult | null | undefined): StepRow[] {
   if (!result?.steps) return steps
@@ -132,12 +133,23 @@ export function backfillFromResult(steps: StepRow[], result: MultiStepResult | n
     if (!sr || (sr.blockingErrors || []).length > 0) return s
     let changed = false
 
-    // 原料：补投料量（当量推算值）
+    // 原料：补当量（由已有投料量反推）与投料量（由当量推算值）
     const reagents = s.reagents.map((r, j) => {
-      if (r.inherited || r.amountKg !== null && r.amountKg !== undefined && r.amountKg !== 0) return r
-      const akg = sr.reagents?.[j]?.actualAmountKg
-      if (akg && akg > 0) { changed = true; return { ...r, amountKg: round2(akg) } }
-      return r
+      const res = sr.reagents?.[j]
+      if (!res) return r
+      // 底物是 1 eq 基准，其当量由引擎固定为 1，无需回填
+      if (r.isSubstrate) return r
+      let nr = r
+      const zeroKg = r.amountKg === null || r.amountKg === undefined || r.amountKg === 0
+      if (zeroKg) {
+        // 只填了当量：补投料量（推算值）
+        const akg = res.actualAmountKg
+        if (akg && akg > 0) { nr = { ...nr, amountKg: round2(akg) }; changed = true }
+      } else if (r.equiv === null || r.equiv === undefined || r.equiv === 0) {
+        // 只填了投料量：补当量，使两个字段一致（消除“实际投料量与当量推算偏差”告警）
+        if (res.equiv > 0) { nr = { ...nr, equiv: Math.round(res.equiv * 1000) / 1000 }; changed = true }
+      }
+      return nr
     })
 
     // 产物：补空缺的收率 / 实际产量（推算值）

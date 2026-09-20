@@ -193,7 +193,8 @@ func computeReagent(r models.ReagentInput, n0 float64, isSubstrate bool, stepBlo
 			}
 		} else {
 			rr.ActualAmountKg = f64(r.AmountKg)
-			rr.Moles = rr.ActualAmountKg * 1000.0 / r.MolWeight
+			// 有效摩尔数与底物同口径：投料量 × 含量%（含量未填视为 100%）
+			rr.Moles = rr.ActualAmountKg * contentFrac(r.Content) * 1000.0 / r.MolWeight
 			if n0 > 0 {
 				rr.Equiv = rr.Moles / n0
 			}

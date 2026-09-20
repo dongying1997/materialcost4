@@ -249,3 +249,83 @@ func containsStr(s []string, sub string) bool {
 	}
 	return false
 }
+
+// TestEquivBackfilledFromAmount 只填实际投料量时，结果里带出反推的当量。
+// 前端「重新计算」按钮用这个 equiv 回填当量输入框（unit-price-canonical-unit 同源的“回填”能力）。
+func TestEquivBackfilledFromAmount(t *testing.T) {
+	// 底物 A：1 kg，分子量 100，含量 100 → n0 = 10 mol
+	// 试剂 B：只填投料量 0.75 kg，分子量 50 → 有效摩尔 15 mol → 1.5 eq
+	reagents := []models.ReagentInput{
+		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)},
+		{Name: "B", MolWeight: 50, AmountKg: f(0.75),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
+	}
+	products := []models.ProductInput{
+		{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
+	}
+	res := CalculateStep(models.ReactionStep{Reagents: reagents, Products: products}, nil)
+	if len(res.BlockingErrors) != 0 {
+		t.Fatalf("unexpected blocking errors: %v", res.BlockingErrors)
+	}
+	if !approx(res.Reagents[1].Equiv, 1.5, 1e-9) {
+		t.Errorf("B 当量 = %v, want 1.5", res.Reagents[1].Equiv)
+	}
+	// 回填值本身自洽：不该再出现“实际投料量与当量推算偏差”告警
+	for _, w := range res.Reagents[1].Warnings {
+		if strings.Contains(w, "投料量与当量推算偏差") {
+			t.Errorf("反推当量后不应再告警，got %v", w)
+		}
+	}
+	// 底物固定 1 eq，不需要回填
+	if !approx(res.Reagents[0].Equiv, 1, 1e-9) {
+		t.Errorf("底物当量 = %v, want 1", res.Reagents[0].Equiv)
+	}
+}
+
+// TestEquivFromAmountUsesContent 只填投料量时，反推的有效摩尔数与当量同样要折含量，
+// 与底物分支（:38）同口径：投料量 × 含量% ÷ 分子量。
+func TestEquivFromAmountUsesContent(t *testing.T) {
+	// 底物 A：0.5 kg，分子量 100，含量 80% → n0 = 4 mol
+	// 试剂 B：2 kg，分子量 100，含量 50% → 有效摩尔 = 2 × 0.5 × 1000 / 100 = 10 mol → 2.5 eq
+	reagents := []models.ReagentInput{
+		{Name: "A", MolWeight: 100, Content: 80, IsSubstrate: true, AmountKg: f(0.5)},
+		{Name: "B", MolWeight: 100, Content: 50, AmountKg: f(2),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
+	}
+	products := []models.ProductInput{
+		{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
+	}
+	res := CalculateStep(models.ReactionStep{Reagents: reagents, Products: products}, nil)
+	if len(res.BlockingErrors) != 0 {
+		t.Fatalf("unexpected blocking errors: %v", res.BlockingErrors)
+	}
+	if !approx(res.Reagents[1].Moles, 10, 1e-9) {
+		t.Errorf("B 有效摩尔数 = %v, want 10（2 kg 折半后除以 100 g/mol）", res.Reagents[1].Moles)
+	}
+	if !approx(res.Reagents[1].Equiv, 2.5, 1e-9) {
+		t.Errorf("B 当量 = %v, want 2.5（10 mol ÷ 4 mol）", res.Reagents[1].Equiv)
+	}
+	// 反推出来的当量配同样的投料量应自洽：不折算会得到 5 eq，再配投料量就会误报偏差
+	if !approx(res.Reagents[1].TheoreticalAmountKg, 2, 1e-9) {
+		t.Errorf("B 理论投料量 = %v, want 2（回填投料量时用它）", res.Reagents[1].TheoreticalAmountKg)
+	}
+}
+
+// TestEquivBackfilledUsesContentWhenEquivGiven 对照组：由当量推算投料量时含量参与计算（理论投料量）。
+func TestEquivBackfilledUsesContentWhenEquivGiven(t *testing.T) {
+	reagents := []models.ReagentInput{
+		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)}, // n0 = 10 mol
+		{Name: "B", MolWeight: 50, Content: 50, Equiv: f(1),                          // 10 mol → 纯品 0.5 kg，折 50% 需 1 kg
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
+	}
+	products := []models.ProductInput{
+		{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
+	}
+	res := CalculateStep(models.ReactionStep{Reagents: reagents, Products: products}, nil)
+	if len(res.BlockingErrors) != 0 {
+		t.Fatalf("unexpected blocking errors: %v", res.BlockingErrors)
+	}
+	if !approx(res.Reagents[1].TheoreticalAmountKg, 1, 1e-9) {
+		t.Errorf("B 理论投料量 = %v, want 1", res.Reagents[1].TheoreticalAmountKg)
+	}
+}
