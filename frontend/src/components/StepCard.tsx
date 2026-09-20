@@ -8,6 +8,7 @@ import type {
 } from '../types'
 import { fmtNum, fmtMoney } from '../utils/file'
 import { priceDrifted, priceFromOption, emptyPrice } from '../utils/reaction'
+import ReagentNameCell from './nameCell'
 
 // ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
 // 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
@@ -41,13 +42,7 @@ const fullInput = { width: '100%' } as const
  */
 const centerText = { input: { textAlign: 'center' } } as const
 
-// 未关联物料库的行在名称下拉里的哨兵值（真实物料 id 恒为正数，不会冲突）
-const UNBOUND_MATERIAL = -1
-
-/**
- * 需要淡灰底的行：多步反应里继承上一步产物的原料行，以及首步中作为底物的行。
- * 这两类都是「基准/承接」性质的行，用比表头稍浅的灰底与普通输入行区分开。
- */
+// 需要淡灰底的行：多步反应里继承上一步产物的原料行，以及首步中作为底物的行
 const HIGHLIGHT_ROW_BG = '#f2f2f2'
 
 /**
@@ -81,9 +76,9 @@ function ReadOnlyCell({ children, align = 'center' }: {
   )
 }
 
-/**
- * 需要进行转换的单位。
- */
+/** 名称列的形态判定、下拉与关联逻辑见 nameCell.tsx（ReagentNameCell） */
+
+// 需要把换算值补进文案的单位（见 priceOptionLabel）
 const CONVERT_UNITS = new Set(['元/g', '元/mol'])
 
 /**
@@ -280,18 +275,17 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     {
       title: '底物', width: COL_RADIO, align: 'center',
       render: (_, r) => (
-        <Tooltip title={r.isSubstrate ? '底物（1 eq 基准）' : '标记为底物'}>
+        <Tooltip title={r.isSubstrate ? '底物(1eq基准)' : '标记为底物'}>
           <Radio checked={r.isSubstrate} onClick={() => markSubstrate(r._key)} />
         </Tooltip>
       ),
     },
     {
-      // 表头与内容同为左对齐：本列不设 align，antd 的 thead 规则默认 text-align:start，
-      // 无需额外覆盖（rc-table 的 align 会同时作用于 th 和 td，设了反而会把两处一起改掉）
+      // 本列不设 align：antd 的 thead 默认就是 text-align:start，
+      // 而 rc-table 的 align 会同时作用于 th 与 td，设了反而把表头也改掉。
       title: '原料名称', width: COL_NAME,
       render: (_, r) => r.inherited ? (
-        // 继承行：文字沿用常规颜色（只靠灰底区分），
-        // 右侧放一个橙色链接图标——位置与普通行的「关联物料库」按钮一致，仅换颜色与提示。
+        // 继承行：常规字色 + 灰底，右侧放一个橙色链接图标（位置与普通行的 🔗 一致，仅颜色与提示不同）
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <ReadOnlyCell align="left">
@@ -307,90 +301,11 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
               icon={<LinkOutlined style={{ fontSize: 12, color: '#fa8c16' }} />} />
           </Tooltip>
         </div>
-      ) : (() => {
-        // 未关联物料库但有名称的行（如导入的方案，导入时 materialId 会被清空）：
-        // Select 找不到匹配项就会渲染成空白的「选择物料」，名称明明在数据里却看不见。
-        // 因此把当前名称作为哨兵项注入，保证名称始终可见。
-        //
-        // 哨兵项的标签写成「点此关联：XXX」而不是裸名称——原来看起来和真实选项
-        // 一模一样，用户点它却毫无反应（点的是哨兵，不是物料）。现在：
-        //   · 库中恰有一条同名物料 → 点哨兵即自动关联
-        //   · 搜不到或多条同名   → 哨兵置灰，改用下拉里的真实物料
-        const bound = r.materialId > 0 && materials.some(m => m.id === r.materialId)
-        const unbound = !bound && !!r.name
-        const sameName = unbound ? materials.filter(m => m.name === r.name) : []
-        const canAutoLink = sameName.length === 1
-        // 哨兵项只显示名称本身（未关联状态由橙色字体体现，详见 labelRender）；
-        // 无法自动关联时补一句原因，避免用户找不到可点的项。
-        const sentinelLabel = !unbound ? ''
-          : canAutoLink ? r.name
-            : sameName.length > 1 ? `${r.name}（库中有 ${sameName.length} 条同名，请从下方选择）`
-              : `${r.name}（物料库中没有此物料）`
-        // 标签只显示名称（不再带 CAS 后缀，避免长名称被挤掉），
-        // 但把名称与 CAS 拼在一个隐藏字段里参与搜索，CAS 依然可搜。
-        const options: { value: number; label: string; disabled?: boolean }[] =
-          materials.map(m => ({ value: m.id, label: m.name }))
-        if (unbound) {
-          options.unshift({ value: UNBOUND_MATERIAL, label: sentinelLabel, disabled: !canAutoLink })
-        }
-        const select = (
-          <Select
-            size="small" showSearch allowClear style={fullInput} placeholder="选择物料"
-            optionFilterProp="label"
-            // 搜索用「名称 + CAS」的复合串，显示仍只有名称
-            filterOption={(input, option) => {
-              const m = materials.find(x => x.id === (option as { value?: number })?.value)
-              const hay = `${m?.name ?? ''} ${m?.cas ?? ''}`.toLowerCase()
-              return hay.includes(input.trim().toLowerCase())
-            }}
-            value={bound ? r.materialId : (unbound ? UNBOUND_MATERIAL : undefined)}
-            options={options}
-            // 未关联物料库的行用橙色字体标出，替代原先在名称前加「点此关联：」前缀
-            labelRender={(props: { value?: unknown; label?: React.ReactNode }) =>
-              props.value === UNBOUND_MATERIAL
-                ? <span style={{ color: '#faad14' }}>{props.label}</span>
-                : <>{props.label}</>
-            }
-            onChange={(v) => {
-              if (v === UNBOUND_MATERIAL) return // 哨兵只用于显示名称，关联走右侧按钮
-              if (v) { pickMaterial(r, v) }
-              else updateReagent(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], latestPrice: null, price: null })
-            }}
-          />
-        )
-        // 关联动作单独给一个按钮，而不是复用下拉项：
-        // 哨兵项本来就处于「已选中」状态，rc-select 单选模式下点击它不会触发
-        // onChange（值没变），用户会以为点了没反应。
-        const linkBtn = (
-          <Tooltip title={
-            !unbound ? '' : canAutoLink ? `关联到物料库中的「${r.name}」`
-              : sameName.length > 1 ? `库中有 ${sameName.length} 条同名物料，无法自动关联，请从下拉里选择`
-                : '物料库中没有同名物料，无法自动关联'
-          }>
-            <Button size="small" type="text" disabled={!unbound || !canAutoLink}
-              style={{ padding: '0 4px', flex: '0 0 auto' }}
-              icon={<LinkOutlined style={{ fontSize: 12, color: !unbound ? '#d9d9d9' : canAutoLink ? '#1677ff' : '#bfbfbf' }} />}
-              onClick={() => { if (unbound && canAutoLink) pickMaterial(r, sameName[0].id) }} />
-          </Tooltip>
-        )
-        // 不论是否已关联都渲染同样的 flex 容器与按钮占位：
-        // 否则未关联行会多出一个 26px 的按钮，把 Select 挤窄（实测两行输入框宽度差 26px），
-        // 两行的输入框宽度就不一致了。
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Tooltip title={
-              !unbound ? '' : canAutoLink
-                ? '该原料未关联物料库（来自导入的方案），计算使用方案自带数据；点右侧 🔗 可关联到库中同名物料'
-                : sameName.length > 1
-                  ? `该原料未关联物料库；库中有 ${sameName.length} 条同名物料，请从下拉里选择`
-                  : '该原料未关联物料库（来自导入的方案），计算使用方案自带数据；请从下拉里选择对应物料'
-            }>
-              <div style={{ flex: 1, minWidth: 0 }}>{select}</div>
-            </Tooltip>
-            {linkBtn}
-          </div>
-        )
-      })(),
+      ) : (
+        // 其余三种形态（已关联 / 未关联可自动关联 / 未关联需手选）见 nameCell.tsx
+        <ReagentNameCell row={r} materials={materials}
+          onPick={pickMaterial} onClear={updateReagent} />
+      ),
     },
     {
       title: 'CAS', width: COL_SEL, align: 'center',
@@ -525,13 +440,16 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     {
       title: '选物料', width: COL_SEL, align: 'center',
       render: (_, p) => (
-        <Select size="small" showSearch allowClear style={fullInput} placeholder="从物料库选"
-          optionFilterProp="label"
-          // 显示只有名称；搜索按「名称 + CAS」，因此输入 CAS 也能筛出物料
-          filterOption={(input, option) => {
-            const m = materials.find(x => x.id === (option as { value?: number })?.value)
-            const hay = `${m?.name ?? ''} ${m?.cas ?? ''}`.toLowerCase()
-            return hay.includes(input.trim().toLowerCase())
+        <Select size="small" allowClear style={fullInput} placeholder="从物料库选"
+          // 顶层的 optionFilterProp / filterOption 已弃用，改挂 showSearch（对象形式自 6.0.0 起支持）
+          showSearch={{
+            optionFilterProp: 'label',
+            // 显示只有名称；搜索按「名称 + CAS」，因此输入 CAS 也能筛出物料
+            filterOption: (input, option) => {
+              const m = materials.find(x => x.id === (option as { value?: number })?.value)
+              const hay = `${m?.name ?? ''} ${m?.cas ?? ''}`.toLowerCase()
+              return hay.includes(input.trim().toLowerCase())
+            },
           }}
           value={p.materialId || undefined}
           options={materials.map(m => ({ value: m.id, label: m.name }))}
