@@ -221,7 +221,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     onChange({ ...step, products: step.products.map(p => (p._key === key ? { ...p, ...patch } : p)) })
   }
   const markSubstrate = (key: string) => {
-    onChange({ ...step, reagents: step.reagents.map(r => ({ ...r, isSubstrate: r._key === key })) })
+    // 底物是 1 eq 基准：标记时把当量固定为 1，避免残留旧当量
+    onChange({ ...step, reagents: step.reagents.map(r => (r._key === key ? { ...r, isSubstrate: true, equiv: 1 } : { ...r, isSubstrate: false })) })
   }
   const markPrimary = (key: string) => {
     onChange({ ...step, products: step.products.map(p => ({ ...p, isSubstrate: p._key === key })) })
@@ -249,7 +250,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     const last = reagents[reagents.length - 1]
     // 最后一行是空白行（未选物料/未填数据）时直接替代，避免残留空白行
     if (last && !last.inherited && !last.materialId && !last.name && !last.equiv && !last.amountKg) {
-      reagents[reagents.length - 1] = { ...last, ...inheritedRow, _key: last._key, isSubstrate: last.isSubstrate }
+      // 底物固定 1 eq，其余保持继承行的空当量
+      reagents[reagents.length - 1] = { ...last, ...inheritedRow, _key: last._key, isSubstrate: last.isSubstrate, equiv: last.isSubstrate ? 1 : null }
     } else {
       reagents.push(inheritedRow)
     }
@@ -339,8 +341,11 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     },
     {
       title: '当量', width: COL_NUM, align: 'center',
-      render: (_, r) => r.inherited && r.isSubstrate ? (
-        <InputNumber size="small" style={fullInput} styles={centerText} value={1} disabled />
+      // 底物固定 1 eq，不可修改
+      render: (_, r) => r.isSubstrate ? (
+        <Tooltip title="底物为 1 eq 基准，不可修改">
+          <InputNumber size="small" style={fullInput} styles={centerText} value={1} disabled />
+        </Tooltip>
       ) : (
         <InputNumber size="small" style={fullInput} styles={centerText} min={0} step={0.1} value={r.equiv ?? undefined}
           placeholder="可空" onChange={(v) => updateReagent(r._key, { equiv: v ?? null })} />
