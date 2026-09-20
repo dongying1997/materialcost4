@@ -4,10 +4,10 @@ import { PlusOutlined, DeleteOutlined, UpOutlined, DownOutlined, LinkOutlined, H
 import type { ColumnsType } from 'antd/es/table'
 import type {
   MaterialWithPrice, StepResult, ReagentRow, ProductRow, StepRow, IntermediateProduct,
-  ReagentResult, ProductResult, PriceSnapshot,
+  ReagentResult, ProductResult, PriceSnapshot, MaterialPriceOption,
 } from '../types'
 import { fmtNum, fmtMoney } from '../utils/file'
-import { priceDrifted, priceFromOption, emptyPrice, PRICE_DRIFT_THRESHOLD } from '../utils/reaction'
+import { priceDrifted, priceFromOption, emptyPrice } from '../utils/reaction'
 
 // ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
 // 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
@@ -82,6 +82,25 @@ function ReadOnlyCell({ children, align = 'center' }: {
 }
 
 /**
+ * 需要进行转换的单位。
+ */
+const CONVERT_UNITS = new Set(['元/g', '元/mol'])
+
+/**
+ * 历史价下拉项的文案：日期 + 报价 [+ → 换算值 元/kg] [+ 供应商]。
+ *
+ * 元/g、元/mol 必须补上换算值：换算后的 元/kg 是反推不回去的（元/mol 要除以
+ * 分子量），也是这些不同单位的报价之间唯一能横向比较成本的数字。
+ */
+function priceOptionLabel(o: MaterialPriceOption): string {
+  const raw = `${fmtMoney(o.price)}${o.unit || ''}`
+  const price = CONVERT_UNITS.has((o.unit || '').trim())
+    ? `${raw} → ${fmtMoney(o.pricePerKg)} 元/kg`
+    : raw
+  return `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}`
+}
+
+/**
  * 单价单元格：可直接手动输入，也可从右侧图标下拉选物料库的历史价格。
  *
  * 布局：两个状态图标都放进输入框自带的 suffix 里，而不是并排的 flex 兄弟节点——
@@ -96,7 +115,7 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
   const current = row.price?.unitPriceYuanPerKg ?? 0
 
   const driftMsg = drifted && latest
-    ? `库中最新价 ${fmtMoney(latest.pricePerKg)} 元/kg（${latest.date}${latest.supplier ? ' · ' + latest.supplier : ''}），与方案当前单价相差超过 ${PRICE_DRIFT_THRESHOLD} 元/kg。方案按快照计算，未自动更新。`
+    ? `与库中最新价${fmtMoney(latest.pricePerKg)}元/kg存在差异`
     : ''
 
   // 价格来源说明：有供应商/日期就显示，便于确认这个数字是从哪来的
@@ -106,24 +125,11 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
 
   const historyMenu = {
     items: [
+      // 与库中最新价不一致时，先把最新价作为不可选中的提示项列在最前
       ...(drifted && latest
         ? [{ key: 'hint', disabled: true, label: `库中最新价 ${fmtMoney(latest.pricePerKg)}（当前 ${fmtMoney(current)}）` }]
         : []),
-      ...opts.map(o => {
-        // 标签以「日期 + 单价」为主；只有 元/g 与 元/mol 才补上「→ x 元/kg」——
-        // 元/kg 报价的换算值与原值相同，再写一遍纯属重复。
-        //
-        // 这半个箭头不能一概删掉：换算后的 元/kg 是反推不回去的（元/mol 要除以
-        // 分子量），也是这些报价唯一能横向比较成本的数字。
-        //
-        // 判断依据是单位本身，对应 internal/service/price.go 的 PriceToYuanPerKg
-        // ——它的 default 分支把其余单位（含空串）一律当作 元/kg 原样返回。若改成
-        // 比较「换算值是否等于原值」，一个空单位就会凑出「20.00 → 20.00 元/kg」。
-        const raw = `${fmtMoney(o.price)}${o.unit || ''}`
-        const needConv = ['元/g', '元/mol'].includes((o.unit || '').trim())
-        const price = needConv ? `${raw} → ${fmtMoney(o.pricePerKg)} 元/kg` : raw
-        return { key: String(o.priceId), label: `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}` }
-      }),
+      ...opts.map(o => ({ key: String(o.priceId), label: priceOptionLabel(o) })),
     ],
     onClick: ({ key }: { key: string }) => {
       const o = opts.find(x => String(x.priceId) === key)
@@ -132,7 +138,7 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
   }
 
   return (
-    <Tooltip title={drifted ? driftMsg : sourceMsg}>
+    <Tooltip title={drifted ? "" : sourceMsg}>
       <InputNumber
         size="small"
         style={{ width: '100%' }}
@@ -159,7 +165,7 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
                 <WarningOutlined style={{ color: '#faad14', fontSize: 13 }} />
               </Tooltip>
             )}
-            <Tooltip title={opts.length ? '从物料库的历史价格中选择' : '该物料在库中没有价格记录'}>
+            <Tooltip title={opts.length ? '从物料库的历史价格中选择' : ''}>
               <Dropdown
                 trigger={['click']}
                 disabled={opts.length === 0}
