@@ -52,10 +52,23 @@ dev_mode:
       - "*.ts" # The frontend directory will be excluded entirely by the setting above.
     git_ignore: true
   executes:
-    - cmd: wails3 build DEV=true
-      type: blocking
+    # The frontend dev server must be registered BEFORE the blocking build:
+    # the refresh engine runs steps in list order, so a background step placed
+    # after the build does not start until the build finishes - and the build
+    # plus `task run` then races vite to the port. When that race is lost the
+    # app exhausts its 10 x 500ms retries before vite has even printed "ready"
+    # and dies with "unable to connect to frontend server".
+    # Registering it first also means it starts once and survives reloads, so
+    # it is never re-spawned behind the blocking build (which would orphan the
+    # previous vite and make the new one fail with EADDRINUSE under strictPort).
     - cmd: wails3 task common:dev:frontend
       type: background
+    - cmd: wails3 build DEV=true
+      type: blocking
+      # Give vite time to bind the port. `wails3 task run` only waits 10 x 500ms
+      # and the first `task` invocation needs ~6s just to run `npm install`,
+      # so without this the backend can still arrive before the server is up.
+      delay_next: 1000
     - cmd: wails3 task run
       type: primary
 

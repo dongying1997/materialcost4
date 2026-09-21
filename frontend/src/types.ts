@@ -17,6 +17,7 @@ import type {
  */
 export type MultiStepResult = CalculateResult
 
+
 export type {
   Material, MaterialWithPrice, Price, ReactionStep, ReagentInput,
   ProductInput, Scheme, PriceSnapshot, StepResult, ReagentResult,
@@ -24,12 +25,25 @@ export type {
 }
 
 // ---- 前端编辑器行类型（在 bindings 基础上扩展 _key 与价格选项）----
+import type { DecStr } from './utils/decimal'
+
+/** 高精度十进制串；从 types 统一对外转出，调用方不必知道它住在 utils/decimal */
+export type { DecStr }
+
+/**
+ * 编辑器行的数值字段一律用 DecStr（十进制字面量字符串）而不是 number，
+ * 以便在编辑过程中保留高精度原值（见 utils/decimal.ts）。
+ * 跨过 Wails bindings 传给 Go 时由 utils/reaction.ts 的 stepsToPayload 统一 toNumber()。
+ */
 
 /** 原料编辑行 */
-export interface ReagentRow extends Omit<ReagentInput, 'content' | 'recoveryRate'> {
+export interface ReagentRow extends Omit<ReagentInput, 'content' | 'recoveryRate' | 'molWeight' | 'equiv' | 'amountKg'> {
   _key: string
-  content: number
-  recoveryRate: number
+  molWeight: DecStr
+  content: DecStr
+  recoveryRate: DecStr
+  equiv: DecStr | null
+  amountKg: DecStr | null
   /** 该物料在物料库中的历史价格（供下拉选择；首项为库中最新价） */
   priceOptions?: MaterialPriceOption[]
   /** 库中最新价，仅用于与价格快照比对并提示变动；不参与计算 */
@@ -37,8 +51,14 @@ export interface ReagentRow extends Omit<ReagentInput, 'content' | 'recoveryRate
 }
 
 /** 产物编辑行 */
-export interface ProductRow extends ProductInput {
+export interface ProductRow extends Omit<ProductInput,
+  'molWeight' | 'molarRatio' | 'weightYield' | 'molarYield' | 'actualYield'> {
   _key: string
+  molWeight: DecStr
+  molarRatio: DecStr
+  weightYield: DecStr | null
+  molarYield: DecStr | null
+  actualYield: DecStr | null
 }
 
 /** 步骤编辑行 */

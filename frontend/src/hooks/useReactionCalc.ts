@@ -8,7 +8,10 @@ import type {
 import { newStep, stepsToPayload, backfillFromResult, upsertPriceOptions } from '../utils/reaction'
 import { usePersistedState } from './useStorage'
 
-const STORAGE_KEY = 'materialcost4:reaction-steps'
+// 存储键带 v2：高精度改造把编辑行的数值字段从 number 换成了 DecStr。
+// 换键让老格式直接失效（否则旧 number 数据既取不出来也写不回去），
+// 代价只是用户升级后需要重填一次当前草稿——方案（数据库）不受影响。
+const STORAGE_KEY = 'materialcost4:reaction-steps:v2'
 
 
 export interface ReactionCalcApi {
@@ -38,6 +41,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   useEffect(() => {
     if (steps.length === 0) setSteps([newStep()])
   }, [steps.length])
+
 
   
 

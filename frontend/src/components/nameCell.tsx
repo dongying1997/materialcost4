@@ -126,7 +126,7 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
             onChange={(v) => {
                 if (v === UNBOUND_MATERIAL) return // 哨兵只用于显示名称，关联走右侧按钮
                 if (v) { onPick(r, v) }
-                else onClear(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: 0, priceOptions: [], latestPrice: null, price: null })
+                else onClear(r._key, { materialId: 0, name: '', cas: '', formula: '', molWeight: '0', priceOptions: [], latestPrice: null, price: null })
             }}
         />
     )

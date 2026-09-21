@@ -1,7 +1,8 @@
 // 反应计算的辅助函数：步骤对象构造与前后端数据序列化
 import type {
-  StepRow, MultiStepResult, ReactionStep, MaterialPriceOption, PriceSnapshot,
+  StepRow, MultiStepResult, ReactionStep, MaterialPriceOption, PriceSnapshot, DecStr,
 } from '../types'
+import { normalize, toNumber } from './decimal'
 
 /** 价格快照与库中最新价的差异阈值（元/kg），超过则提示用户 */
 export const PRICE_DRIFT_THRESHOLD = 0.01
@@ -47,33 +48,42 @@ export function newStep(): StepRow {
     id: 0, stepNum: 1, name: '',
     reagents: [{
       _key: uid('r'),
-      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
-      content: 100, recoveryRate: 0, isSubstrate: true, equiv: null, amountKg: null,
+      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
+      content: '100', recoveryRate: '0', isSubstrate: true, equiv: null, amountKg: null,
       price: null, priceOptions: [], latestPrice: null,
     }],
     products: [{
       _key: uid('p'),
-      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
-      isSubstrate: true, molarRatio: 1, weightYield: null, molarYield: null, actualYield: null,
+      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
+      isSubstrate: true, molarRatio: '1', weightYield: null, molarYield: null, actualYield: null,
     }],
   }
+}
+
+/** 可空字段的 DecStr → number 转换（null 保持 null，后端用 *float64 表达「未填」） */
+function optNum(v: DecStr | null | undefined): number | null {
+  return v === null || v === undefined ? null : toNumber(v)
 }
 
 /** 将编辑器步骤行序列化为后端输入 */
 export function stepsToPayload(steps: StepRow[]): ReactionStep[] {
   return steps.map(s => ({
     id: s.id, stepNum: s.stepNum, name: s.name,
+    // 这里是 DecStr → number 的唯一边界：编辑器内全程保留字符串高精度，
+    // 只有交给 Go 时才转成 double（见 utils/decimal.ts toNumber）
     reagents: s.reagents.map(r => ({
       materialId: r.materialId, inherited: r.inherited, name: r.name, cas: r.cas,
-      formula: r.formula, molWeight: r.molWeight, content: r.content, recoveryRate: r.recoveryRate,
-      isSubstrate: r.isSubstrate, equiv: r.equiv, amountKg: r.amountKg,
+      formula: r.formula, molWeight: toNumber(r.molWeight), content: toNumber(r.content),
+      recoveryRate: toNumber(r.recoveryRate),
+      isSubstrate: r.isSubstrate, equiv: optNum(r.equiv), amountKg: optNum(r.amountKg),
       price: r.price,
     })),
     products: s.products.map(p => ({
       materialId: p.materialId, inherited: p.inherited, name: p.name, cas: p.cas,
-      formula: p.formula, molWeight: p.molWeight, isSubstrate: p.isSubstrate,
-      molarRatio: p.molarRatio, weightYield: p.weightYield, molarYield: p.molarYield,
-      actualYield: p.actualYield,
+      formula: p.formula, molWeight: toNumber(p.molWeight), isSubstrate: p.isSubstrate,
+      molarRatio: toNumber(p.molarRatio), weightYield: optNum(p.weightYield),
+      molarYield: optNum(p.molarYield),
+      actualYield: optNum(p.actualYield),
     })),
   }))
 }
@@ -83,13 +93,38 @@ export function stepsFromScheme(steps: ReactionStep[] | null | undefined): StepR
   return (steps || []).map(s => ({
     _key: uid('s'),
     id: s.id, stepNum: s.stepNum, name: s.name,
+    // 反序列化是 number → DecStr 的边界（与 stepsToPayload 相对）：
+    // 后端 double 转成十进制字面量后，编辑器内全程按字符串处理
     reagents: (s.reagents || []).map(r => ({
-      ...r, _key: uid('r'), priceOptions: [], latestPrice: null,
+      ...r,
+      _key: uid('r'),
+      molWeight: reqStr(r.molWeight),
+      content: reqStr(r.content),
+      recoveryRate: reqStr(r.recoveryRate),
+      equiv: optStr(r.equiv),
+      amountKg: optStr(r.amountKg),
+      priceOptions: [], latestPrice: null,
     })),
     products: (s.products || []).map(p => ({
-      ...p, _key: uid('p'),
+      ...p,
+      _key: uid('p'),
+      molWeight: reqStr(p.molWeight),
+      molarRatio: reqStr(p.molarRatio),
+      weightYield: optStr(p.weightYield),
+      molarYield: optStr(p.molarYield),
+      actualYield: optStr(p.actualYield),
     })),
   }))
+}
+
+/** number → DecStr：必填字段（null 视为 0） */
+function reqStr(v: number | null | undefined): DecStr {
+  return normalize(v) ?? '0'
+}
+
+/** number → DecStr：可空字段（null 保持 null，语义是「未填」） */
+function optStr(v: number | null | undefined): DecStr | null {
+  return v === null || v === undefined ? null : normalize(v)
 }
 
 /**
@@ -113,15 +148,14 @@ export function upsertPriceOptions(
   return changed ? out : steps
 }
 
-/** 四舍五入到两位小数 */
-export function round2(v: number): number {
-  return Math.round(v * 100) / 100
-}
-
 /**
  * 把计算结果回填到编辑行中的空缺字段（仅当整条链无阻塞错误时调用）。
  * 原料：缺当量 → 用实际投料量反推当量；缺实际投料量 → 用当量推算值。
- * 产物：缺收率/实际产量 → 用推算值。当量为比值、保留三位小数，其余回填值修约到两位小数。
+ * 产物：缺收率/实际产量 → 用推算值。
+ *
+ * **回填值一律保留引擎给的全精度**（normalize 只去尾零，不修约）：
+ * 修约是展示层的事（见 DecimalInput / formatRule），一旦在回填时把值截断，
+ * 用户的投料量就会被永久改写，且之后无论怎么编辑都救不回来。
  * 返回新的步骤数组；若无任何空缺则原样返回。
  */
 export function backfillFromResult(steps: StepRow[], result: MultiStepResult | null | undefined): StepRow[] {
@@ -140,14 +174,14 @@ export function backfillFromResult(steps: StepRow[], result: MultiStepResult | n
       // 底物是 1 eq 基准，其当量由引擎固定为 1，无需回填
       if (r.isSubstrate) return r
       let nr = r
-      const zeroKg = r.amountKg === null || r.amountKg === undefined || r.amountKg === 0
+      const zeroKg = !r.amountKg || toNumber(r.amountKg) === 0
       if (zeroKg) {
         // 只填了当量：补投料量（推算值）
         const akg = res.actualAmountKg
-        if (akg && akg > 0) { nr = { ...nr, amountKg: round2(akg) }; changed = true }
-      } else if (r.equiv === null || r.equiv === undefined || r.equiv === 0) {
+        if (akg && akg > 0) { nr = { ...nr, amountKg: normalize(akg) }; changed = true }
+      } else if (!r.equiv || toNumber(r.equiv) === 0) {
         // 只填了投料量：补当量，使两个字段一致（消除“实际投料量与当量推算偏差”告警）
-        if (res.equiv > 0) { nr = { ...nr, equiv: Math.round(res.equiv * 1000) / 1000 }; changed = true }
+        if (res.equiv > 0) { nr = { ...nr, equiv: normalize(res.equiv) }; changed = true }
       }
       return nr
     })
@@ -156,14 +190,14 @@ export function backfillFromResult(steps: StepRow[], result: MultiStepResult | n
     const products = s.products.map((p, j) => {
       const pr = sr.products?.[j]
       if (!pr) return p
-      const hasWeight = p.weightYield !== null && p.weightYield !== undefined && p.weightYield !== 0
-      const hasMolar = p.molarYield !== null && p.molarYield !== undefined && p.molarYield !== 0
-      const hasActual = p.actualYield !== null && p.actualYield !== undefined && p.actualYield !== 0
+      const hasWeight = !!p.weightYield && toNumber(p.weightYield) !== 0
+      const hasMolar = !!p.molarYield && toNumber(p.molarYield) !== 0
+      const hasActual = !!p.actualYield && toNumber(p.actualYield) !== 0
       if (hasWeight && hasMolar && hasActual) return p
       let np = p
-      if (!hasWeight && pr.weightYield > 0) { np = { ...np, weightYield: round2(pr.weightYield) }; changed = true }
-      if (!hasMolar && pr.molarYield > 0) { np = { ...np, molarYield: round2(pr.molarYield) }; changed = true }
-      if (!hasActual && pr.actualYieldKg > 0) { np = { ...np, actualYield: round2(pr.actualYieldKg) }; changed = true }
+      if (!hasWeight && pr.weightYield > 0) { np = { ...np, weightYield: normalize(pr.weightYield) }; changed = true }
+      if (!hasMolar && pr.molarYield > 0) { np = { ...np, molarYield: normalize(pr.molarYield) }; changed = true }
+      if (!hasActual && pr.actualYieldKg > 0) { np = { ...np, actualYield: normalize(pr.actualYieldKg) }; changed = true }
       return np
     })
 
@@ -180,6 +214,7 @@ export function backfillFromResult(steps: StepRow[], result: MultiStepResult | n
  * 某步原料在总成本中的占比 = 本步占比 × 后续每步 baseShare 之积（链式相乘）。
  * 返回与 steps 等长的数组；某步不可乘（无继承原料/无成本/有阻塞）时其乘数为 1，后续不再传递。
  * 例如三步反应：第 2 步物料占比 = 本步占比 × baseShare₃；第 1 步 = 本步占比 × baseShare₂ × baseShare₃。
+ * 乘数本身仍是 number（纯计算），仅展示时走 formatRuleGrouped。
  */
 export function chainMultipliers(steps: StepRow[], result: MultiStepResult | null | undefined): number[] {
   const stepResults = result?.steps || []

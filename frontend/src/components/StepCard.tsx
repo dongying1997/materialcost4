@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card, Table, Radio, Select, InputNumber, Input, Button, Space, Tooltip, Tag, Dropdown } from 'antd'
+import { Card, Table, Radio, Select, Input, Button, Space, Tooltip, Tag, Dropdown } from 'antd'
 import { PlusOutlined, DeleteOutlined, UpOutlined, DownOutlined, LinkOutlined, HistoryOutlined, WarningOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type {
@@ -8,7 +8,9 @@ import type {
 } from '../types'
 import { fmtNum, fmtMoney } from '../utils/file'
 import { priceDrifted, priceFromOption, emptyPrice } from '../utils/reaction'
+import { normalize, toNumber } from '../utils/decimal'
 import ReagentNameCell from './nameCell'
+import DecimalInput from './DecimalInput'
 
 // ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
 // 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
@@ -54,6 +56,8 @@ const readOnlyCellStyle: React.CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   width: '100%',
+  // 高度对齐 size="small" 的输入框（24px）。若将来把表格换成 middle，
+  // 这里要同步改成 32——写死是刻意的，避免边框与相邻输入框不齐。
   height: 24,
   boxSizing: 'border-box',
   padding: '0 7px',
@@ -94,6 +98,16 @@ function priceOptionLabel(o: MaterialPriceOption): string {
   return `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}`
 }
 
+/** 价格快照归一化：金额字段去掉尾零，避免 number 的 100.0 与 DecStr 的 "100" 反复互转 */
+function canonicalPrice(p: PriceSnapshot | null): PriceSnapshot | null {
+  if (!p) return null
+  return {
+    ...p,
+    unitPriceYuanPerKg: toNumber(normalize(p.unitPriceYuanPerKg) ?? '0'),
+    price: toNumber(normalize(p.price) ?? '0'),
+  }
+}
+
 /**
  * 单价单元格：可直接手动输入，也可从右侧图标下拉选物料库的历史价格。
  *
@@ -107,6 +121,8 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
   const drifted = priceDrifted(row.price, row.latestPrice)
   const latest = row.latestPrice
   const current = row.price?.unitPriceYuanPerKg ?? 0
+  // 单价快照里的金额（元/kg）是 number，编辑器按 DecStr 处理
+  const priceText = row.price ? normalize(row.price.unitPriceYuanPerKg) : null
 
   const driftMsg = drifted && latest
     ? `与库中最新价${fmtMoney(latest.pricePerKg)}元/kg存在差异`
@@ -133,18 +149,16 @@ function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnap
 
   return (
     <Tooltip title={drifted ? "" : sourceMsg}>
-      <InputNumber
+      <DecimalInput
         size="small"
         style={{ width: '100%' }}
         styles={centerText}
         min={0}
-        step={0.01}
-        controls={false}
-        value={row.price ? current : null}
+        value={priceText}
         placeholder="填单价"
         onChange={(v) => {
-          if (v === null || v === undefined) { onChange(null); return }
-          const n = typeof v === 'number' ? v : 0
+          if (v === null) { onChange(null); return }
+          const n = toNumber(v)
           // 手动输入的单价是自定义报价，不再是物料库里的那条报价记录——
           // 必须丢掉 supplier/date/spec，否则界面会把库里的登记时间当成
           // 这条手填价格的来源显示出来（曾因此误报过）。
@@ -221,7 +235,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
   }
   const markSubstrate = (key: string) => {
     // 底物是 1 eq 基准：标记时把当量固定为 1，避免残留旧当量
-    onChange({ ...step, reagents: step.reagents.map(r => (r._key === key ? { ...r, isSubstrate: true, equiv: 1 } : { ...r, isSubstrate: false })) })
+    onChange({ ...step, reagents: step.reagents.map(r => (r._key === key ? { ...r, isSubstrate: true, equiv: '1' } : { ...r, isSubstrate: false })) })
   }
   const markPrimary = (key: string) => {
     onChange({ ...step, products: step.products.map(p => ({ ...p, isSubstrate: p._key === key })) })
@@ -231,8 +245,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       ...step,
       reagents: [...step.reagents, {
         _key: `r${Math.random().toString(36).slice(2)}`,
-        materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: 0,
-        content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
+        materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
+        content: '100', recoveryRate: '0', isSubstrate: step.reagents.length === 0,
         equiv: null, amountKg: null, price: null, priceOptions: [], latestPrice: null,
       }],
     })
@@ -241,8 +255,8 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     const key = `r${Math.random().toString(36).slice(2)}`
     const inheritedRow: ReagentRow = {
       _key: key, materialId: 0, inherited: true, name: prevProduct?.name || '（继承上一步产物）',
-      cas: '', formula: '', molWeight: prevProduct?.molWeight || 0,
-      content: 100, recoveryRate: 0, isSubstrate: step.reagents.length === 0,
+      cas: '', formula: '', molWeight: normalize(prevProduct?.molWeight) ?? '0',
+      content: '100', recoveryRate: '0', isSubstrate: step.reagents.length === 0,
       equiv: null, amountKg: null, price: null, priceOptions: [], latestPrice: null,
     }
     const reagents = [...step.reagents]
@@ -250,7 +264,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     // 最后一行是空白行（未选物料/未填数据）时直接替代，避免残留空白行
     if (last && !last.inherited && !last.materialId && !last.name && !last.equiv && !last.amountKg) {
       // 底物固定 1 eq，其余保持继承行的空当量
-      reagents[reagents.length - 1] = { ...last, ...inheritedRow, _key: last._key, isSubstrate: last.isSubstrate, equiv: last.isSubstrate ? 1 : null }
+      reagents[reagents.length - 1] = { ...last, ...inheritedRow, _key: last._key, isSubstrate: last.isSubstrate, equiv: last.isSubstrate ? '1' : null }
     } else {
       reagents.push(inheritedRow)
     }
@@ -262,11 +276,17 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     if (!m) return
     updateReagent(row._key, {
       materialId, inherited: false, name: m.name, cas: m.cas, formula: m.formula,
-      molWeight: m.molWeight, content: m.content || row.content,
-      recoveryRate: row.recoveryRate || m.recoveryRate || 0,
-      // 保留已填的单价：换/关联物料不应把用户手填的价格抹掉。
+      molWeight: normalize(m.molWeight) ?? '0', content: m.content ? normalize(m.content)! : row.content,
+      recoveryRate: row.recoveryRate || normalize(m.recoveryRate) || '0',
+      // 单价：保留已填的值，换/关联物料不应把用户手填的价格抹掉。
       // 想改用库中价，点单价右侧的历史价图标选择即可（差异会在单元格里提示）。
-      price: row.price, priceOptions: [], latestPrice: null,
+      // 价格快照仍是后端的 number 字段（价格不在本次高精度改造范围内），
+      // 这里归一化一遍，保证输入框的「未改动即不回写」判断不会被 100.0 之类的尾零干扰。
+      // 含量/回收率的空值语义与改造前一致：content 为空才用库值，
+      // recoveryRate 沿用「0 也视为未填」的旧行为（虽然是 DecStr，"0" 同样是 falsy 之外的非空串，
+      // 这里显式用 normalize 兜底，避免把 "0" 误当成需要覆盖）。
+      price: canonicalPrice(row.price),
+      priceOptions: [], latestPrice: null,
     })
     // 选完物料后拉取该物料的历史价格，供下拉选择与价格变动提示
     onPriceOptions?.(materialId)
@@ -320,22 +340,22 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       title: '分子量', width: COL_NUM, align: 'center',
       render: (_, r) => (
         <ReadOnlyCell>
-          <span style={{ fontSize: 13 }}>{r.molWeight ? fmtMoney(r.molWeight) : '-'}</span>
+          <span style={{ fontSize: 13 }}>{r.molWeight && toNumber(r.molWeight) !== 0 ? fmtMoney(r.molWeight) : '-'}</span>
         </ReadOnlyCell>
       ),
     },
     {
       title: '含量%', width: COL_NUM, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} max={100} value={r.content}
-          onChange={(v) => updateReagent(r._key, { content: v ?? 100 })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} max={100} value={r.content}
+          onChange={(v) => updateReagent(r._key, { content: v ?? '100' })} />
       ),
     },
     {
       title: '回收率%', width: COL_NUM, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} max={100} value={r.recoveryRate}
-          onChange={(v) => updateReagent(r._key, { recoveryRate: v ?? 0 })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} max={100} value={r.recoveryRate}
+          onChange={(v) => updateReagent(r._key, { recoveryRate: v ?? '0' })} />
       ),
     },
     {
@@ -343,18 +363,20 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       // 底物固定 1 eq，不可修改
       render: (_, r) => r.isSubstrate ? (
         <Tooltip title="底物为 1 eq 基准，不可修改">
-          <InputNumber size="small" style={fullInput} styles={centerText} value={1} disabled />
+          <DecimalInput size="small" style={fullInput} styles={centerText} value="1" disabled onChange={() => {}} />
         </Tooltip>
       ) : (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} step={0.1} value={r.equiv ?? undefined}
-          placeholder="可空" onChange={(v) => updateReagent(r._key, { equiv: v ?? null })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} allowEmpty
+          value={r.equiv} placeholder="可空"
+          onChange={(v) => updateReagent(r._key, { equiv: v })} />
       ),
     },
     {
       title: '投料量 kg', width: COL_NUM, align: 'center',
       render: (_, r) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} step={0.01} precision={2} value={r.amountKg ?? undefined}
-          placeholder="可空" onChange={(v) => updateReagent(r._key, { amountKg: v ?? null })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} allowEmpty
+          value={r.amountKg} placeholder="可空"
+          onChange={(v) => updateReagent(r._key, { amountKg: v })} />
       ),
     },
     {
@@ -459,7 +481,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
           options={materials.map(m => ({ value: m.id, label: m.name }))}
           onChange={(v) => {
             const m = materials.find(x => x.id === v)
-            if (m) updateProduct(p._key, { materialId: v, name: m.name, cas: m.cas, formula: m.formula, molWeight: m.molWeight })
+            if (m) updateProduct(p._key, { materialId: v, name: m.name, cas: m.cas, formula: m.formula, molWeight: normalize(m.molWeight) ?? '0' })
             else updateProduct(p._key, { materialId: 0 })
           }}
         />
@@ -468,36 +490,41 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     {
       title: '分子量', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} value={p.molWeight || undefined}
-          placeholder="必填" onChange={(v) => updateProduct(p._key, { molWeight: v ?? 0 })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0}
+          value={p.molWeight || null} placeholder="必填"
+          onChange={(v) => updateProduct(p._key, { molWeight: v ?? '0' })} />
       ),
     },
     {
       title: '计量数', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} step={0.1} value={p.molarRatio || undefined}
-          onChange={(v) => updateProduct(p._key, { molarRatio: v ?? 1 })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0}
+          value={p.molarRatio || null}
+          onChange={(v) => updateProduct(p._key, { molarRatio: v ?? '1' })} />
       ),
     },
     {
       title: '重量收率%', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} max={200} value={p.weightYield ?? undefined}
-          placeholder="可空" onChange={(v) => updateProduct(p._key, { weightYield: v ?? null })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} max={200} allowEmpty
+          value={p.weightYield} placeholder="可空"
+          onChange={(v) => updateProduct(p._key, { weightYield: v })} />
       ),
     },
     {
       title: '摩尔收率%', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} max={200} value={p.molarYield ?? undefined}
-          placeholder="可空" onChange={(v) => updateProduct(p._key, { molarYield: v ?? null })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} max={200} allowEmpty
+          value={p.molarYield} placeholder="可空"
+          onChange={(v) => updateProduct(p._key, { molarYield: v })} />
       ),
     },
     {
       title: '实际产量 kg', width: COL_NUM, align: 'center',
       render: (_, p) => (
-        <InputNumber size="small" style={fullInput} styles={centerText} min={0} step={0.01} precision={2} value={p.actualYield ?? undefined}
-          placeholder="可空" onChange={(v) => updateProduct(p._key, { actualYield: v ?? null })} />
+        <DecimalInput size="small" style={fullInput} styles={centerText} min={0} allowEmpty
+          value={p.actualYield} placeholder="可空"
+          onChange={(v) => updateProduct(p._key, { actualYield: v })} />
       ),
     },
     {
