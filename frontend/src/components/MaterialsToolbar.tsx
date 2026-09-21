@@ -38,7 +38,7 @@ function MaterialsToolbar({ importing, exporting, onSearch, onCreate, onImport, 
       <Button icon={<DownloadOutlined />} onClick={onDownloadTemplate}>下载模板</Button>
       {/* 破坏性操作用 auto 外边距推到最右侧，与其它按钮拉开距离 */}
       <Button danger icon={<DeleteOutlined />} onClick={onClear} style={{ marginLeft: 'auto' }}>
-        清空物料库
+        清空物料
       </Button>
     </div>
   )
