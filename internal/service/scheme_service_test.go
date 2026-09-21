@@ -9,11 +9,11 @@ import (
 	"github.com/dongying1997/materialcost4/internal/models"
 )
 
-func newSchemeSvc(t *testing.T) (*ReactionService, *db.SchemeRepo) {
+func newSchemeSvc(t *testing.T) (*SchemeService, *db.SchemeRepo) {
 	t.Helper()
 	d := newTestDB(t)
 	repo := db.NewSchemeRepo(d)
-	svc := NewReactionService(db.NewMaterialRepo(d), repo)
+	svc := NewSchemeService(repo)
 	return svc, repo
 }
 
@@ -23,6 +23,62 @@ func sampleScheme(id int64, name string) *models.Scheme {
 		Name:  name,
 		Note:  "测试方案",
 		Steps: []models.ReactionStep{},
+	}
+}
+
+// TestSchemeSaveLoad 方案保存与读取往返。
+func TestSchemeSaveLoad(t *testing.T) {
+	svc, _ := newSchemeSvc(t)
+
+	steps := []models.ReactionStep{
+		{
+			StepNum: 1, Name: "第一步",
+			Reagents: []models.ReagentInput{
+				{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)},
+			},
+			Products: []models.ProductInput{
+				{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
+			},
+		},
+	}
+	sch := &models.Scheme{Name: "测试方案", Steps: steps}
+	saved, err := svc.SaveScheme(sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.ID == 0 {
+		t.Fatal("scheme id not set")
+	}
+	loaded, err := svc.GetScheme(saved.ID)
+	if err != nil || loaded == nil {
+		t.Fatalf("get scheme: %v", err)
+	}
+	if len(loaded.Steps) != 1 || loaded.Steps[0].Reagents[0].Name != "A" {
+		t.Errorf("scheme steps not preserved: %+v", loaded.Steps)
+	}
+
+	// 无名称方案被拒绝
+	if _, err := svc.SaveScheme(&models.Scheme{}); err == nil {
+		t.Error("空名称方案应被拒绝")
+	}
+
+	// 更新沿用同一个 id
+	loaded.Name = "改名后的方案"
+	updated, err := svc.SaveScheme(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != saved.ID || updated.Name != "改名后的方案" {
+		t.Errorf("更新方案失败: %+v", updated)
+	}
+
+	// 删除
+	if err := svc.DeleteScheme(saved.ID); err != nil {
+		t.Fatal(err)
+	}
+	gone, err := svc.GetScheme(saved.ID)
+	if err != nil || gone != nil {
+		t.Errorf("方案应已删除: %+v, %v", gone, err)
 	}
 }
 
@@ -190,7 +246,7 @@ func TestImportRoundTripIsSelfContained(t *testing.T) {
 		t.Fatalf("导入失败: %+v %v", res, err)
 	}
 
-	// 导入后的方案：materialId 已清空，但可直接计算
+	// 导入后的方案：materialId 已清空，但可直接计算（计算不读物料库）
 	list, err := repo.List()
 	if err != nil {
 		t.Fatal(err)
@@ -207,15 +263,16 @@ func TestImportRoundTripIsSelfContained(t *testing.T) {
 	if imported.Steps[0].Reagents[0].MaterialID != 0 {
 		t.Errorf("导入应清空 materialId: %d", imported.Steps[0].Reagents[0].MaterialID)
 	}
-	calc, err := svc.Calculate(CalculateInput{Steps: imported.Steps})
+	// 计算是纯函数：即便传 nil 物料库也照样算得出来，结果只取决于方案自带快照
+	got, err := NewReactionService(nil).Calculate(CalculateInput{Steps: imported.Steps})
 	if err != nil {
 		t.Fatalf("导入后计算失败: %v", err)
 	}
-	if len(calc.Steps[0].BlockingErrors) != 0 {
-		t.Errorf("导入后不应有阻塞错误: %v", calc.Steps[0].BlockingErrors)
+	if len(got.Steps[0].BlockingErrors) != 0 {
+		t.Errorf("导入后不应有阻塞错误: %v", got.Steps[0].BlockingErrors)
 	}
-	if calc.Steps[0].TotalCost != 10 {
-		t.Errorf("导入后总成本 = %v, want 10（应完全来自文件内的快照）", calc.Steps[0].TotalCost)
+	if got.Steps[0].TotalCost != 10 {
+		t.Errorf("导入后总成本 = %v, want 10（应完全来自文件内的快照）", got.Steps[0].TotalCost)
 	}
 }
 
@@ -225,7 +282,8 @@ func TestCrossMachineSimulation(t *testing.T) {
 	d := newTestDB(t)
 	mrepo := db.NewMaterialRepo(d)
 	schemeRepo := db.NewSchemeRepo(d)
-	svc := NewReactionService(mrepo, schemeRepo)
+	svc := NewSchemeService(schemeRepo)
+	calc := NewReactionService(mrepo)
 
 	// A 库：物料 + 两条价格
 	id, err := mrepo.Insert(&models.Material{Name: "甲磺酸", CAS: "75-75-2", MolWeight: 96.11, Content: 100})
@@ -284,20 +342,20 @@ func TestCrossMachineSimulation(t *testing.T) {
 	if err != nil || len(list) != 1 {
 		t.Fatalf("导入后方案数 = %d, %v", len(list), err)
 	}
-	calc, err := svc.Calculate(CalculateInput{Steps: list[0].Steps})
+	got, err := calc.Calculate(CalculateInput{Steps: list[0].Steps})
 	if err != nil {
 		t.Fatalf("计算失败: %v", err)
 	}
-	if n := len(calc.Steps[0].BlockingErrors); n != 0 {
-		t.Errorf("不应有阻塞错误: %v", calc.Steps[0].BlockingErrors)
+	if n := len(got.Steps[0].BlockingErrors); n != 0 {
+		t.Errorf("不应有阻塞错误: %v", got.Steps[0].BlockingErrors)
 	}
 	// 成本完全来自文件内的快照：1kg × 25 元/kg = 25（而非库里的 40/45）
-	if calc.Steps[0].TotalCost != 25 {
-		t.Errorf("总成本 = %v, want 25（应完全来自导出的价格快照）", calc.Steps[0].TotalCost)
+	if got.Steps[0].TotalCost != 25 {
+		t.Errorf("总成本 = %v, want 25（应完全来自导出的价格快照）", got.Steps[0].TotalCost)
 	}
 	// 价格来源信息也应随文件带过去
-	got := list[0].Steps[0].Reagents[0].Price
-	if got == nil || got.Supplier != "旧供应商" || got.Date != "2024-01-01" {
-		t.Errorf("价格快照的供应商/日期丢失: %+v", got)
+	snap := list[0].Steps[0].Reagents[0].Price
+	if snap == nil || snap.Supplier != "旧供应商" || snap.Date != "2024-01-01" {
+		t.Errorf("价格快照的供应商/日期丢失: %+v", snap)
 	}
 }

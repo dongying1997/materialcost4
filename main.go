@@ -33,7 +33,8 @@ func main() {
 	schemeRepo := db.NewSchemeRepo(database)
 
 	materialSvc := service.NewMaterialService(materialRepo)
-	reactionSvc := service.NewReactionService(materialRepo, schemeRepo)
+	reactionSvc := service.NewReactionService(materialRepo)
+	schemeSvc := service.NewSchemeService(schemeRepo)
 	excelSvc := service.NewExcelService(materialRepo)
 
 	app := application.New(application.Options{
@@ -42,6 +43,7 @@ func main() {
 		Services: []application.Service{
 			application.NewService(materialSvc),
 			application.NewService(reactionSvc),
+			application.NewService(schemeSvc),
 			application.NewService(excelSvc),
 		},
 		Assets: application.AssetOptions{

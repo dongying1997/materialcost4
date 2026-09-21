@@ -115,7 +115,7 @@ func TestClearAllMaterials(t *testing.T) {
 	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 3.5, Unit: "元/kg", Date: day}); err != nil {
 		t.Fatal(err)
 	}
-	schemeSvc := NewReactionService(repo, db.NewSchemeRepo(d))
+	schemeSvc := NewSchemeService(db.NewSchemeRepo(d))
 	scheme, err := schemeSvc.SaveScheme(&models.Scheme{Name: "保留的方案", Steps: []models.ReactionStep{}})
 	if err != nil {
 		t.Fatal(err)
@@ -168,7 +168,7 @@ func TestClearAllMaterials(t *testing.T) {
 // 用一个库中不存在的 materialId，计算仍应正常出结果（方案自带全部输入）。
 func TestCalculateIgnoresMaterialLibrary(t *testing.T) {
 	d := newTestDB(t)
-	svc := NewReactionService(db.NewMaterialRepo(d), db.NewSchemeRepo(d))
+	svc := NewReactionService(db.NewMaterialRepo(d))
 
 	steps := []models.ReactionStep{{
 		StepNum: 1, Name: "反应1",
@@ -200,7 +200,7 @@ func TestCalculateIgnoresMaterialLibrary(t *testing.T) {
 func TestPriceSnapshotOverridesLibrary(t *testing.T) {
 	d := newTestDB(t)
 	repo := db.NewMaterialRepo(d)
-	svc := NewReactionService(repo, db.NewSchemeRepo(d))
+	svc := NewReactionService(repo)
 
 	id, err := repo.Insert(&models.Material{Name: "甲醇", CAS: "67-56-1", MolWeight: 32.04, Content: 99.5})
 	if err != nil {
@@ -228,49 +228,6 @@ func TestPriceSnapshotOverridesLibrary(t *testing.T) {
 	}
 	if got := res.Steps[0].TotalCost; got != 10 {
 		t.Errorf("总成本 = %v, want 10（快照优先于库中最新价 999）", got)
-	}
-}
-
-func TestSchemeSaveLoad(t *testing.T) {
-	d := newTestDB(t)
-	repo := db.NewMaterialRepo(d)
-	schemeRepo := db.NewSchemeRepo(d)
-	svc := NewReactionService(repo, schemeRepo)
-
-	steps := []models.ReactionStep{
-		{
-			StepNum: 1, Name: "第一步",
-			Reagents: []models.ReagentInput{
-				{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)},
-			},
-			Products: []models.ProductInput{
-				{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)},
-			},
-		},
-	}
-	sch := &models.Scheme{Name: "测试方案", Steps: steps}
-	saved, err := svc.SaveScheme(sch)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if saved.ID == 0 {
-		t.Fatal("scheme id not set")
-	}
-	loaded, err := svc.GetScheme(saved.ID)
-	if err != nil || loaded == nil {
-		t.Fatalf("get scheme: %v", err)
-	}
-	if len(loaded.Steps) != 1 || loaded.Steps[0].Reagents[0].Name != "A" {
-		t.Errorf("scheme steps not preserved: %+v", loaded.Steps)
-	}
-
-	// 计算载入的方案
-	res, err := svc.Calculate(CalculateInput{Steps: loaded.Steps})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(res.Steps) != 1 || res.Steps[0].Products[0].ActualYieldKg != 0.8 {
-		t.Errorf("calc after load failed: %+v", res.Steps[0])
 	}
 }
 

@@ -12,10 +12,6 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
-import * as models$0 from "../models/models.js";
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore: Unused imports
 import * as $models from "./models.js";
 
 /**
@@ -29,65 +25,10 @@ export function Calculate(input: $models.CalculateInput): $CancellablePromise<$m
 }
 
 /**
- * DeleteScheme 删除方案。
- */
-export function DeleteScheme(id: number): $CancellablePromise<void> {
-    return $Call.ByID(783483566, id);
-}
-
-/**
- * ExportSchemes 导出选中方案为 SchemeExportFile（纯函数，便于测试）。
- */
-export function ExportSchemes(ids: number[] | null): $CancellablePromise<$models.SchemeExportFile | null> {
-    return $Call.ByID(1256995440, ids);
-}
-
-/**
- * ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
- * ids 为空表示导出全部方案。返回保存的文件路径（用户取消时为空字符串）。
- * 桌面 WebView 不支持前端 a[download] 下载，因此由后端完成文件保存。
- */
-export function ExportSchemesToFile(ids: number[] | null): $CancellablePromise<string> {
-    return $Call.ByID(4250726943, ids);
-}
-
-/**
  * FormatMoney 暴露给前端格式化金额。
  */
 export function FormatMoney(v: number): $CancellablePromise<string> {
     return $Call.ByID(741710839, v);
-}
-
-/**
- * GetScheme 获取单个方案。
- */
-export function GetScheme(id: number): $CancellablePromise<models$0.Scheme | null> {
-    return $Call.ByID(3184332985, id);
-}
-
-/**
- * ImportSchemes 解析 JSON 内容并导入方案（name 为空或 steps 为空的方案跳过）。
- * 
- * 导入文件是自足的，不需要在目标库中解析或重连物料：materialId 一律清空，
- * 计算直接用文件内的快照。这样跨机器导入不会出现 id 错指（静默算错钱）。
- */
-export function ImportSchemes(data: string | null): $CancellablePromise<$models.SchemeImportResult | null> {
-    return $Call.ByID(2662591393, data);
-}
-
-/**
- * ImportSchemesFromFile 弹出打开对话框选择 JSON 文件并导入方案。
- * 返回导入结果与出现的问题（文件为空或无方案时返回错误）。
- */
-export function ImportSchemesFromFile(): $CancellablePromise<$models.SchemeImportResult | null> {
-    return $Call.ByID(3246473823);
-}
-
-/**
- * ListSchemes 方案列表。
- */
-export function ListSchemes(): $CancellablePromise<(models$0.Scheme | null)[] | null> {
-    return $Call.ByID(2765576286);
 }
 
 /**
@@ -101,11 +42,4 @@ export function ListSchemes(): $CancellablePromise<(models$0.Scheme | null)[] | 
  */
 export function PriceOptionsForMaterial(materialID: number): $CancellablePromise<$models.MaterialPriceOption[] | null> {
     return $Call.ByID(1885373859, materialID);
-}
-
-/**
- * SaveScheme 保存方案（id 为 0 时新增）。
- */
-export function SaveScheme(sch: models$0.Scheme | null): $CancellablePromise<models$0.Scheme | null> {
-    return $Call.ByID(3985361040, sch);
 }

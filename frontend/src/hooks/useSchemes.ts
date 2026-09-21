@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
 import { Modal } from 'antd'
-import { ReactionService } from '../bindings'
+import { SchemeService } from '../bindings'
 import type { Scheme, SchemePayload, StepRow } from '../types'
 import { stepsToPayload, stepsFromScheme, newStep } from '../utils/reaction'
 import { fileToBase64 } from '../utils/file'
@@ -41,7 +41,7 @@ export function useSchemes(
   // 加载方案列表
   const loadSchemes = useCallback(async () => {
     try {
-      const data = await ReactionService.ListSchemes()
+      const data = await SchemeService.ListSchemes()
       setSchemes((data || []) as Scheme[])
     } catch (e) {
       messageApi.error(String(e))
@@ -56,7 +56,7 @@ export function useSchemes(
       // 时间字段由后端生成，不发送（空字符串会触发 time.Time 反序列化报错）
     }
     try {
-      await ReactionService.SaveScheme(payload as Scheme)
+      await SchemeService.SaveScheme(payload as Scheme)
       messageApi.success('方案已保存')
       loadSchemes()
       return true
@@ -68,7 +68,7 @@ export function useSchemes(
 
   const loadScheme = async (sch: Scheme) => {
     try {
-      const full = await ReactionService.GetScheme(sch.id)
+      const full = await SchemeService.GetScheme(sch.id)
       if (!full) return
       const rows = stepsFromScheme(full.steps)
       onLoaded(rows.length ? rows : [newStep()])
@@ -80,7 +80,7 @@ export function useSchemes(
 
   const deleteScheme = async (sch: Scheme) => {
     try {
-      await ReactionService.DeleteScheme(sch.id)
+      await SchemeService.DeleteScheme(sch.id)
       messageApi.success('已删除')
       setSelectedIds((prev) => prev.filter((id) => id !== sch.id))
       loadSchemes()
@@ -97,7 +97,7 @@ export function useSchemes(
   const exportSchemes = async (ids: number[]) => {
     setExporting(true)
     try {
-      const path = await ReactionService.ExportSchemesToFile(ids)
+      const path = await SchemeService.ExportSchemesToFile(ids)
       if (path) messageApi.success(`已导出 ${ids.length || schemes.length} 个方案到 ${path}`)
     } catch (e) {
       messageApi.error(String(e))
@@ -110,7 +110,7 @@ export function useSchemes(
     setImporting(true)
     try {
       const b64 = await fileToBase64(file)
-      const result = await ReactionService.ImportSchemes(b64)
+      const result = await SchemeService.ImportSchemes(b64)
       const r = result as any
       messageApi.success(`导入完成：成功导入 ${r.imported ?? 0} 个方案`)
       if (r.errors && r.errors.length) {
@@ -140,7 +140,7 @@ export function useSchemes(
     if (!confirmed) return
     try {
       for (const id of selectedIds) {
-        await ReactionService.DeleteScheme(id)
+        await SchemeService.DeleteScheme(id)
       }
       messageApi.success(`已删除 ${n} 个方案`)
       setSelectedIds([])

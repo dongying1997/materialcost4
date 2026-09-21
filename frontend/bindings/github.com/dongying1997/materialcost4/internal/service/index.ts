@@ -4,10 +4,12 @@
 import * as ExcelService from "./excelservice.js";
 import * as MaterialService from "./materialservice.js";
 import * as ReactionService from "./reactionservice.js";
+import * as SchemeService from "./schemeservice.js";
 export {
     ExcelService,
     MaterialService,
-    ReactionService
+    ReactionService,
+    SchemeService
 };
 
 export type {
