@@ -42,8 +42,7 @@ const fullInput = { width: '100%' } as const
  */
 const centerText = { input: { textAlign: 'center' } } as const
 
-// 需要淡灰底的行：多步反应里继承上一步产物的原料行，以及首步中作为底物的行
-const HIGHLIGHT_ROW_BG = '#f2f2f2'
+
 
 /**
  * 只读数值单元格的外框，样式对齐 InputNumber / Select：

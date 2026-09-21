@@ -1,4 +1,4 @@
-import { Button, Divider } from 'antd'
+import { Button } from 'antd'
 import {
   PlusOutlined, SaveOutlined, FolderOpenOutlined,
   DeleteOutlined, ReloadOutlined,
