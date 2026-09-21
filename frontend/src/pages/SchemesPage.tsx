@@ -10,9 +10,9 @@ function SchemesPage() {
   const navigate = useNavigate()
   const [messageApi, contextHolder] = message.useMessage()
 
-  // 载入方案到编辑器，并通过路由 state 把步骤传给反应计算页
-  const handleLoaded = (rows: StepRow[]) => {
-    navigate('/reaction', { state: { loadRows: rows } })
+  // 载入方案到编辑器，并通过路由 state 把步骤与附图一起传给反应计算页
+  const handleLoaded = (rows: StepRow[], image: string) => {
+    navigate('/reaction', { state: { loadRows: rows, loadImage: image } })
   }
   const schemes = useSchemes(messageApi, handleLoaded)
 

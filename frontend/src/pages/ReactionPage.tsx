@@ -5,9 +5,10 @@ import { useReactionCalc } from '../hooks/useReactionCalc'
 import { useSchemes } from '../hooks/useSchemes'
 import StepCard from '../components/StepCard'
 import CalcToolbar from '../components/CalcToolbar'
-import CalcAlerts from '../components/CalcAlerts'
+import SchemeImageBox from '../components/SchemeImageBox'
 import SchemeModals from '../components/SchemeModals'
 import { chainMultipliers } from '../utils/reaction'
+import { usePasteImage } from '../hooks/usePasteImage'
 import type { StepRow, StepResult } from '../types'
 
 /** 反应计算编辑器页 */
@@ -26,27 +27,35 @@ function ReactionPage() {
 
   // 从方案管理页载入步骤（经路由 state 传入），注入后清除 state 防止重放
   useEffect(() => {
-    const rows = (location.state as { loadRows?: StepRow[] } | null)?.loadRows
-    if (rows?.length) calc.setSteps(rows)
+    const st = location.state as { loadRows?: StepRow[]; loadImage?: string } | null
+    if (st?.loadRows?.length) {
+      calc.setSteps(st.loadRows)
+      // 没附图的方案传空串：必须显式清掉当前图，否则上一张图会被带进新方案
+      calc.setImage(st.loadImage || '')
+    }
     if (location.state) navigate('/reaction', { replace: true, state: null })
   }, []) // eslint-disable-line
 
-  // 从「载入方案」弹窗载入步骤到编辑器
-  const handleLoaded = (rows: StepRow[]) => {
+  // 从「载入方案」弹窗载入步骤到编辑器（图片随方案一起换掉）
+  const handleLoaded = (rows: StepRow[], image: string) => {
     calc.setSteps(rows)
+    calc.setImage(image)
     setLoadOpen(false)
   }
   const schemes = useSchemes(messageApi, handleLoaded)
 
+  const paste = usePasteImage({ onImage: calc.setImage })
+
   const doSaveScheme = async () => {
     const v = await form.validateFields()
-    const ok = await schemes.saveScheme(v.name, v.note || '', calc.steps)
+    const ok = await schemes.saveScheme(v.name, v.note || '', calc.steps, calc.image)
     if (ok) setSaveOpen(false)
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {contextHolder}
+      {paste.contextHolder}
       <div style={{ flexShrink: 0 }}>
         <CalcToolbar
           calculating={calc.calculating}
@@ -55,8 +64,11 @@ function ReactionPage() {
           onLoad={() => { schemes.loadSchemes(); setLoadOpen(true) }}
           onRecalculate={calc.recalculate}
           onClear={calc.clearAll}
+          onPasteImage={paste.requestPaste}
+          onRemoveImage={() => calc.setImage('')}
+          hasImage={!!calc.image}
         />
-        <CalcAlerts result={calc.result} />
+        <SchemeImageBox image={calc.image} />
       </div>
       <div style={{ overflow: 'auto', minHeight: 0, paddingBottom: 16 }}>
         {calc.steps.map((s, i) => (

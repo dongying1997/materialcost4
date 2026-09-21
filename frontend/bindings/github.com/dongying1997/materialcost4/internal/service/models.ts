@@ -13,6 +13,12 @@ import * as models$0 from "../models/models.js";
  */
 export interface CalculateInput {
     "steps": models$0.ReactionStep[] | null;
+
+    /**
+     * Image 方案附图的完整 dataURL。完全不参与计算，
+     * 只是让「载入方案 → 计算」这条链路能把图片一起带回前端。
+     */
+    "image": string;
 }
 
 /**
@@ -35,6 +41,11 @@ export interface CalculateResult {
      * 总单位成本（元/kg）= 总成本 ÷ 总产量
      */
     "totalUnitCost": number;
+
+    /**
+     * Image 原样回带方案附图，供前端在图片框里展示
+     */
+    "image": string;
 }
 
 /**

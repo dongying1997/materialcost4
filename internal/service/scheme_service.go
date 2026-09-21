@@ -183,7 +183,9 @@ type SchemeExportFile struct {
 }
 
 // schemeExportVersion 当前导出格式版本。
-const schemeExportVersion = 2
+// v3：方案新增 image 字段（base64 附图），随导出文件一起携带。
+// 旧版本文件（无 image）仍可正常导入，该字段缺省为空串。
+const schemeExportVersion = 3
 
 // ExportSchemesToFile 将选中的方案导出为 JSON 文件，弹出保存对话框写入磁盘。
 // ids 为空表示导出全部方案。返回保存的文件路径（用户取消时为空字符串）。

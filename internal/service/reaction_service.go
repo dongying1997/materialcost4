@@ -21,6 +21,9 @@ func NewReactionService(materialRepo *db.MaterialRepo) *ReactionService {
 // CalculateInput 计算请求。
 type CalculateInput struct {
 	Steps []models.ReactionStep `json:"steps"`
+	// Image 方案附图的完整 dataURL。完全不参与计算，
+	// 只是让「载入方案 → 计算」这条链路能把图片一起带回前端。
+	Image string `json:"image"`
 }
 
 // Calculate 执行反应成本计算。
@@ -30,12 +33,15 @@ type CalculateInput struct {
 func (s *ReactionService) Calculate(input CalculateInput) (*CalculateResult, error) {
 	return &CalculateResult{
 		MultiStepResult: *engine.CalculateMultiStep(input.Steps),
+		Image:           input.Image,
 	}, nil
 }
 
 // CalculateResult 计算结果。
 type CalculateResult struct {
 	engine.MultiStepResult
+	// Image 原样回带方案附图，供前端在图片框里展示
+	Image string `json:"image"`
 }
 
 // MaterialPriceOption 物料可选价格下拉项。

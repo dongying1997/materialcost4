@@ -40,7 +40,7 @@ func Open(path string) (*DB, error) {
 	return d, nil
 }
 
-// migrate 建表。
+// migrate 建表并补齐历史库缺失的列。
 func (d *DB) migrate() error {
 	if err := d.rebuildCASIndex(); err != nil {
 		return err
@@ -80,6 +80,7 @@ func (d *DB) migrate() error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			note TEXT NOT NULL DEFAULT '',
+			image TEXT NOT NULL DEFAULT '',
 			steps TEXT NOT NULL DEFAULT '[]',
 			created_at TEXT NOT NULL,
 			updated_at TEXT NOT NULL
@@ -90,7 +91,43 @@ func (d *DB) migrate() error {
 			return err
 		}
 	}
-	return nil
+	return d.addSchemeImageColumn()
+}
+
+// addSchemeImageColumn 给升级前建的 schemes 表补上 image 列。
+//
+// SQLite 不支持 ADD COLUMN IF NOT EXISTS，重复执行会报 duplicate column name，
+// 所以先查表结构确认列不存在再改。新库由上面的 CREATE TABLE 直接带上该列，
+// 这里会走「已存在」分支直接返回。
+func (d *DB) addSchemeImageColumn() error {
+	has, err := d.hasColumn("schemes", "image")
+	if err != nil || has {
+		return err
+	}
+	_, err = d.Exec(`ALTER TABLE schemes ADD COLUMN image TEXT NOT NULL DEFAULT ''`)
+	return err
+}
+
+// hasColumn 判断表上是否已有某列。
+func (d *DB) hasColumn(table, column string) (bool, error) {
+	rows, err := d.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return false, err
+		}
+		if strings.EqualFold(name, column) {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 // rebuildCASIndex 删除旧的无条件唯一索引，交由 migrate 重建为部分索引。

@@ -14,7 +14,7 @@ export interface SchemeApi {
   exporting: boolean
   importing: boolean
   loadSchemes: () => void
-  saveScheme: (name: string, note: string, steps: StepRow[]) => Promise<boolean>
+  saveScheme: (name: string, note: string, steps: StepRow[], image: string) => Promise<boolean>
   loadSchemeById: (id: number) => Promise<void>
   deleteSchemeById: (id: number) => Promise<void>
   toggleSelect: (id: number) => void
@@ -31,7 +31,7 @@ export interface SchemeApi {
  */
 export function useSchemes(
   messageApi: MessageInstance,
-  onLoaded: (rows: StepRow[]) => void,
+  onLoaded: (rows: StepRow[], image: string) => void,
 ): SchemeApi {
   const [schemes, setSchemes] = useState<SchemeSummary[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -49,9 +49,9 @@ export function useSchemes(
   }, [messageApi])
   useEffect(() => { loadSchemes() }, [loadSchemes])
 
-  const saveScheme = async (name: string, note: string, steps: StepRow[]): Promise<boolean> => {
+  const saveScheme = async (name: string, note: string, steps: StepRow[], image: string): Promise<boolean> => {
     const payload: SchemePayload = {
-      id: 0, name, note,
+      id: 0, name, note, image,
       steps: stepsToPayload(steps),
       // 时间字段由后端生成，不发送（空字符串会触发 time.Time 反序列化报错）
     }
@@ -72,7 +72,8 @@ export function useSchemes(
       const full = await SchemeService.GetScheme(id)
       if (!full) return
       const rows = stepsFromScheme(full.steps)
-      onLoaded(rows.length ? rows : [newStep()])
+      // 图片为空串表示该方案没附图——此时应清掉当前图，否则会把上一张图带进新方案
+      onLoaded(rows.length ? rows : [newStep()], full.image || '')
       messageApi.success(`已载入方案「${full.name}」`)
     } catch (e) {
       messageApi.error(String(e))

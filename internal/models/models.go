@@ -94,9 +94,14 @@ type ProductInput struct {
 
 // Scheme 方案
 type Scheme struct {
-	ID        int64          `json:"id"`
-	Name      string         `json:"name"`
-	Note      string         `json:"note"`
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+	Note string `json:"note"`
+	// Image 方案附带的图片，存完整 dataURL（形如 data:image/png;base64,...）。
+	// 保留 MIME 前缀而不是只存 base64：粘贴进来的可能是 JPEG/WebP/PNG，
+	// 只留 base64 就丢了格式信息，展示时只能赌浏览器嗅探。
+	// 与 steps 一样随方案持久化、随导出文件携带，因此跨机器导入图片也在。
+	Image     string         `json:"image"`
 	Steps     []ReactionStep `json:"steps"`
 	CreatedAt time.Time      `json:"createdAt"`
 	UpdatedAt time.Time      `json:"updatedAt"`

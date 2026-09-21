@@ -145,3 +145,107 @@ func TestCASIndexAllowsMultipleEmptyCAS(t *testing.T) {
 		t.Error("expected duplicate non-empty CAS to be rejected")
 	}
 }
+
+// TestSchemeImageColumnMigration 升级前建的库（schemes 无 image 列）打开后应自动补列，
+// 且旧数据完整、新列默认空串。
+func TestSchemeImageColumnMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+
+	// 造一个「旧版」库：照升级前的建表语句建表（没有 image 列）
+	d, err := Open(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if _, err := d.Exec(`DROP TABLE IF EXISTS schemes`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`CREATE TABLE schemes (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		note TEXT NOT NULL DEFAULT '',
+		steps TEXT NOT NULL DEFAULT '[]',
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.Exec(`INSERT INTO schemes (name,note,steps,created_at,updated_at) VALUES (?,?,?,?,?)`,
+		"旧方案", "备注", `[]`, "2026-01-01 10:00:00", "2026-01-01 10:00:00"); err != nil {
+		t.Fatal(err)
+	}
+	d.Close()
+
+	// 再次打开：迁移应补上 image 列
+	d, err = Open(path)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer d.Close()
+
+	has, err := d.hasColumn("schemes", "image")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !has {
+		t.Fatal("迁移后 schemes 应存在 image 列")
+	}
+
+	repo := NewSchemeRepo(d)
+	sch, err := repo.Get(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sch == nil {
+		t.Fatal("旧方案应仍可读取")
+	}
+	if sch.Name != "旧方案" || sch.Note != "备注" {
+		t.Errorf("旧数据被破坏: name=%q note=%q", sch.Name, sch.Note)
+	}
+	if sch.Image != "" {
+		t.Errorf("旧方案的 image 应为空串，得到 %q", sch.Image)
+	}
+}
+
+// TestSchemeImageRoundTrip 图片随方案往返，且重复打开库不会踩 ADD COLUMN 的重复错误。
+func TestSchemeImageRoundTrip(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test.db")
+	d, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewSchemeRepo(d)
+
+	const img = "iVBORw0KGgoAAAANSUhEUg=="
+	sch := &models.Scheme{Name: "带图方案", Image: img}
+	id, err := repo.Insert(sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.Image != img {
+		t.Fatalf("image 往返失败: %+v", got)
+	}
+
+	// 更新
+	got.Image = ""
+	if err := repo.Update(got); err != nil {
+		t.Fatal(err)
+	}
+	got2, _ := repo.Get(id)
+	if got2.Image != "" {
+		t.Errorf("清空图片后应为空串，得到 %q", got2.Image)
+	}
+	d.Close()
+
+	// 反复打开：migrate 每次都跑，ADD COLUMN 不能被重复执行
+	for i := 0; i < 3; i++ {
+		d2, err := Open(path)
+		if err != nil {
+			t.Fatalf("第 %d 次重开失败: %v", i+1, err)
+		}
+		d2.Close()
+	}
+}

@@ -12,6 +12,9 @@ import { usePersistedState } from './useStorage'
 // 换键让老格式直接失效（否则旧 number 数据既取不出来也写不回去），
 // 代价只是用户升级后需要重填一次当前草稿——方案（数据库）不受影响。
 const STORAGE_KEY = 'materialcost4:reaction-steps:v2'
+// 图片单独存一个键，不塞进 steps：图片是大字符串，混在步骤里会让每次步骤改动
+// 都连带重写整张图，也让「载入方案」时步骤与图片的更新来源纠缠不清。
+const IMAGE_KEY = 'materialcost4:reaction-image:v1'
 
 
 export interface ReactionCalcApi {
@@ -25,6 +28,9 @@ export interface ReactionCalcApi {
   removeStep: (index: number) => void
   moveStep: (index: number, direction: 1 | -1) => void
   clearAll: () => void
+  /** 方案附图（完整 dataURL） */
+  image: string
+  setImage: (v: string) => void
   recalculate: () => void
   ensurePriceOptions: (materialId: number) => void
 }
@@ -35,6 +41,8 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const [materials, setMaterials] = useState<MaterialWithPrice[]>([])
   const [result, setResult] = useState<MultiStepResult | null>(null)
   const [calculating, setCalculating] = useState(false)
+  // 方案附图（完整 dataURL）。随方案保存 / 载入 / 导出。
+  const [image, setImage] = usePersistedState(IMAGE_KEY, '')
   const priceOptionsCache = useRef<Record<number, MaterialPriceOption[]>>({})
 
   // 初始化一步
@@ -69,14 +77,14 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const calculate = useCallback(async () => {
     setCalculating(true)
     try {
-      const r = await ReactionService.Calculate({ steps: stepsToPayload(steps) })
+      const r = await ReactionService.Calculate({ steps: stepsToPayload(steps), image })
       setResult(r as MultiStepResult)
     } catch (e) {
       messageApi.error(String(e))
     } finally {
       setCalculating(false)
     }
-  }, [steps, setSteps, messageApi])
+  }, [steps, image, setSteps, messageApi])
 
   useEffect(() => {
     if (calcRef.current) clearTimeout(calcRef.current)
@@ -104,6 +112,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const clearAll = () => {
     setSteps([newStep()])
     setResult(null)
+    setImage('')
   }
 
   // 拉取某物料的历史价格（库仅作查询来源）。
@@ -126,7 +135,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const recalculate = async () => {
     setCalculating(true)
     try {
-      const r = await ReactionService.Calculate({ steps: stepsToPayload(steps) })
+      const r = await ReactionService.Calculate({ steps: stepsToPayload(steps), image })
       setResult(r as MultiStepResult)
       // 回填空缺数据（回填为推算值）
       const filled = backfillFromResult(steps, r as MultiStepResult)
@@ -140,7 +149,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
 
   return {
     steps, setSteps, materials, result, calculating,
-    updateStep, addStep, removeStep, moveStep, clearAll,
+    updateStep, addStep, removeStep, moveStep, clearAll, image, setImage,
     recalculate, ensurePriceOptions,
   }
 }

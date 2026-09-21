@@ -25,8 +25,9 @@ func (r *SchemeRepo) Insert(s *models.Scheme) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	res, err := r.db.Exec(`INSERT INTO schemes (name,note,steps,created_at,updated_at) VALUES (?,?,?,?,?)`,
-		s.Name, s.Note, string(stepsJSON), s.CreatedAt.Format("2006-01-02 15:04:05"), s.UpdatedAt.Format("2006-01-02 15:04:05"))
+	res, err := r.db.Exec(`INSERT INTO schemes (name,note,image,steps,created_at,updated_at) VALUES (?,?,?,?,?,?)`,
+		s.Name, s.Note, s.Image, string(stepsJSON),
+		s.CreatedAt.Format("2006-01-02 15:04:05"), s.UpdatedAt.Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return 0, err
 	}
@@ -40,8 +41,9 @@ func (r *SchemeRepo) Update(s *models.Scheme) error {
 	if err != nil {
 		return err
 	}
-	_, err = r.db.Exec(`UPDATE schemes SET name=?, note=?, steps=?, updated_at=? WHERE id=?`,
-		s.Name, s.Note, string(stepsJSON), s.UpdatedAt.Format("2006-01-02 15:04:05"), s.ID)
+	_, err = r.db.Exec(`UPDATE schemes SET name=?, note=?, image=?, steps=?, updated_at=? WHERE id=?`,
+		s.Name, s.Note, s.Image, string(stepsJSON),
+		s.UpdatedAt.Format("2006-01-02 15:04:05"), s.ID)
 	return err
 }
 
@@ -53,7 +55,7 @@ func (r *SchemeRepo) Delete(id int64) error {
 
 // List 方案列表。
 func (r *SchemeRepo) List() ([]*models.Scheme, error) {
-	rows, err := r.db.Query(`SELECT id,name,note,steps,created_at,updated_at FROM schemes ORDER BY updated_at DESC`)
+	rows, err := r.db.Query(`SELECT id,name,note,image,steps,created_at,updated_at FROM schemes ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +64,7 @@ func (r *SchemeRepo) List() ([]*models.Scheme, error) {
 	for rows.Next() {
 		s := &models.Scheme{}
 		var stepsJSON, created, updated string
-		if err := rows.Scan(&s.ID, &s.Name, &s.Note, &stepsJSON, &created, &updated); err != nil {
+		if err := rows.Scan(&s.ID, &s.Name, &s.Note, &s.Image, &stepsJSON, &created, &updated); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(stepsJSON), &s.Steps); err != nil {
@@ -77,10 +79,10 @@ func (r *SchemeRepo) List() ([]*models.Scheme, error) {
 
 // Get 取单个方案。
 func (r *SchemeRepo) Get(id int64) (*models.Scheme, error) {
-	row := r.db.QueryRow(`SELECT id,name,note,steps,created_at,updated_at FROM schemes WHERE id=?`, id)
+	row := r.db.QueryRow(`SELECT id,name,note,image,steps,created_at,updated_at FROM schemes WHERE id=?`, id)
 	s := &models.Scheme{}
 	var stepsJSON, created, updated string
-	if err := row.Scan(&s.ID, &s.Name, &s.Note, &stepsJSON, &created, &updated); err != nil {
+	if err := row.Scan(&s.ID, &s.Name, &s.Note, &s.Image, &stepsJSON, &created, &updated); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
