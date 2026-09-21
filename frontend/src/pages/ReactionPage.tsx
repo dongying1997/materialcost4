@@ -49,7 +49,6 @@ function ReactionPage() {
       {contextHolder}
       <div style={{ flexShrink: 0 }}>
         <CalcToolbar
-          result={calc.result}
           calculating={calc.calculating}
           onAddStep={calc.addStep}
           onSave={() => { form.resetFields(); setSaveOpen(true) }}

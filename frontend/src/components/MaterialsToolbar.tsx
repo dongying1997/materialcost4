@@ -3,6 +3,7 @@ import {
   PlusOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, ExportOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
+import ToolbarStrip from './ToolbarStrip'
 
 interface Props {
   importing: boolean
@@ -18,7 +19,7 @@ interface Props {
 /** 物料库工具栏：搜索框 + 新增 + Excel 导入 / 导出 + 下载模板 + 清空 */
 function MaterialsToolbar({ importing, exporting, onSearch, onCreate, onImport, onDownloadTemplate, onExport, onClear }: Props) {
   return (
-    <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <ToolbarStrip>
       <Input.Search
         placeholder="搜索编码/名称/CAS/化学式"
         allowClear style={{ width: 280 }}
@@ -40,7 +41,7 @@ function MaterialsToolbar({ importing, exporting, onSearch, onCreate, onImport, 
       <Button danger icon={<DeleteOutlined />} onClick={onClear} style={{ marginLeft: 'auto' }}>
         清空物料
       </Button>
-    </div>
+    </ToolbarStrip>
   )
 }
 

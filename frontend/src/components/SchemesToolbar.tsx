@@ -1,5 +1,6 @@
 import { Button, Typography, Upload } from 'antd'
 import { ExportOutlined, ImportOutlined, DeleteOutlined } from '@ant-design/icons'
+import ToolbarStrip from './ToolbarStrip'
 
 interface Props {
   selectedCount: number
@@ -17,7 +18,7 @@ function SchemesToolbar({
   onExportSelected, onExportAll, onImport, onDeleteSelected,
 }: Props) {
   return (
-    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+    <ToolbarStrip>
       <Typography.Text style={{ marginRight: 4 }}>
         {selectedCount > 0 && <span style={{ color: '#1677ff' }}>已选 {selectedCount} 个方案</span>}
       </Typography.Text>
@@ -47,7 +48,7 @@ function SchemesToolbar({
       >
         删除选中
       </Button>
-    </div>
+    </ToolbarStrip>
   )
 }
 
