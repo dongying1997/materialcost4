@@ -22,12 +22,10 @@ function CalcToolbar({ calculating, onAddStep, onSave, onLoad, onRecalculate, on
       <Button type="primary" icon={<PlusOutlined />} onClick={onAddStep}>添加步骤</Button>
       <Button icon={<SaveOutlined />} onClick={onSave}>保存方案</Button>
       <Button icon={<FolderOpenOutlined />} onClick={onLoad}>载入方案</Button>
-      <Button icon={<ReloadOutlined />} onClick={onRecalculate} loading={calculating}>重新计算</Button>
-      <Button icon={<DeleteOutlined />} onClick={onClear}>清空</Button>
-      <Divider type="vertical" />
-      {/* <Statistic title="总成本 (元)" value={totalCost} precision={2} prefix="¥" style={{ minWidth: 130 }} />
-      <Statistic title="总产量 (kg)" value={totalYield} precision={4} style={{ minWidth: 110 }} />
-      <Statistic title="总单位成本 (元/kg)" value={totalUnitCost} precision={2} style={{ minWidth: 140 }} /> */}
+      <Button icon={<ReloadOutlined />} onClick={onRecalculate} loading={calculating}>计算补全</Button>
+      <Button danger icon={<DeleteOutlined />} onClick={onClear} style={{ marginLeft: 'auto' }}>
+        清空数据
+      </Button>      
     </div>
   )
 }
