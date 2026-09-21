@@ -619,10 +619,11 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     >
       <Table {...tableProps} dataSource={step.reagents} columns={reagentColumns}
         scroll={{ x: TOTAL_WIDTH }}
-        onRow={(r) => {
-          const highlight = r.inherited || (index === 0 && r.isSubstrate)
-          return highlight ? { style: { background: HIGHLIGHT_ROW_BG } } : {}
-        }}
+        // 被标记为底物、继承上一步产物的行不再使用深色背景
+        // onRow={(r) => {
+        //   const highlight = r.inherited || (index === 0 && r.isSubstrate)
+        //   return highlight ? { style: { background: HIGHLIGHT_ROW_BG } } : {}
+        // }}
         locale={{ emptyText: '暂无原料' }} />
 
       <Table {...tableProps} dataSource={step.products} columns={productColumns}
