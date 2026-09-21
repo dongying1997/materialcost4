@@ -1,6 +1,5 @@
 import { Button, Typography, Upload } from 'antd'
 import { ExportOutlined, ImportOutlined, DeleteOutlined } from '@ant-design/icons'
-import Divider from 'antd/lib/divider'
 
 interface Props {
   selectedCount: number
