@@ -20,9 +20,13 @@ function MaterialEditModal({ open, editing, form, onOk, onCancel }: Props) {
       onOk={onOk}
       onCancel={onCancel}
       width={560}
+      // 新增时表单多出「初始价格」一段，在小屏幕上会顶到窗口边缘；
+      // 给内容区滚动而不是让弹窗继续长高
+      styles={{ body: { maxHeight: '64vh', overflowY: 'auto', paddingInlineEnd: 8 } }}
       destroyOnClose
     >
-      <MaterialForm form={form} />
+      {/* 价格表单只在新增时出现：编辑已有物料的价格走「价格」抽屉的历史列表 */}
+      <MaterialForm form={form} withPrice={!editing} />
     </Modal>
   )
 }

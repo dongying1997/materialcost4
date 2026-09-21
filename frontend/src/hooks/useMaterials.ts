@@ -3,8 +3,9 @@ import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
 import { Form, Modal } from 'antd'
 import { MaterialService, ExcelService } from '../bindings'
-import type { Material, MaterialPayload, MaterialWithPrice } from '../types'
+import type { Material, MaterialPayload, MaterialWithPrice, Price, PricePayload } from '../types'
 import { fileToBase64 } from '../utils/file'
+import dayjs from 'dayjs'
 
 export interface MaterialsApi {
   list: MaterialWithPrice[]
@@ -72,6 +73,8 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const openCreate = () => {
     setEditing(null)
     form.resetFields()
+    // 价格的单位给个默认值（与价格抽屉一致），其余留空由用户按需填
+    form.setFieldsValue({ priceUnit: '元/kg' })
     setEditOpen(true)
   }
 
@@ -95,9 +98,57 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
       content: values.content || 0, recoveryRate: values.recoveryRate || 0,
       note: values.note || '',
     }
+
+    // 价格整体可选：只有用户真的动了价格表单才处理。
+    // 判据只看价格块自己的字段（都以 price 开头），刻意不含：
+    //   - 物料自身的字段（名称/分子量/含量 等），那是建物料的信号，不是填价格的信号
+    //   - priceUnit：它带默认值「元/kg」，有值不代表用户填过价格
+    // 注意价格块的「含量(%)」命名成 priceContent 而不是 content，两者分属两块表单，
+    // 同名会互相覆盖。
+    const touchedPrice = editing === null && (
+      values.priceValue != null || values.priceDate != null ||
+      !!values.priceSupplier || !!values.priceSpec || values.priceContent != null
+    )
+    if (touchedPrice && (values.priceValue == null || values.priceValue <= 0)) {
+      messageApi.warning('已填写价格信息，请补上价格金额（或清空价格栏只新增物料）')
+      return
+    }
+
     try {
-      await MaterialService.SaveMaterial(payload as Material)
-      messageApi.success(editing ? '物料已更新' : '物料已新增')
+      const saved = await MaterialService.SaveMaterial(payload as Material)
+      if (!saved) {
+        messageApi.error('物料保存失败：后端未返回物料')
+        return
+      }
+      if (touchedPrice) {
+        // 物料必须先落库拿到 id，价格才能挂到它下面——
+        // 因此这里是两次调用而不是一个事务；价格存失败不影响已建好的物料。
+        const pricePayload: PricePayload = {
+          id: 0,
+          materialId: saved.id,
+          price: values.priceValue,
+          unit: values.priceUnit || '元/kg',
+          supplier: values.priceSupplier || '',
+          // 后端 time.Time 需要完整 RFC3339（本地时区偏移），纯日期会解析失败；
+          // 没填日期时按今天算，与价格抽屉里「默认今天」的行为一致
+          date: (values.priceDate || dayjs()).format('YYYY-MM-DDTHH:mm:ssZ'),
+          spec: values.priceSpec || '',
+          content: values.priceContent || 0,
+          note: '',
+        }
+        try {
+          await MaterialService.SavePrice(pricePayload as Price)
+          messageApi.success('物料与价格已新增')
+        } catch (pe) {
+          // 物料已经建好了，把这一点说清楚，否则用户会以为整次操作都失败而重复新增
+          messageApi.error(`物料已新增，但价格保存失败：${String(pe)}`)
+          setEditOpen(false)
+          load()
+          return
+        }
+      } else {
+        messageApi.success(editing ? '物料已更新' : '物料已新增')
+      }
       setEditOpen(false)
       load()
     } catch (e) {
