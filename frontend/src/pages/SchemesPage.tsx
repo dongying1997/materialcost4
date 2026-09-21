@@ -38,8 +38,8 @@ function SchemesPage() {
           schemes={schemes.schemes}
           selectedIds={schemes.selectedIds}
           onToggleSelect={schemes.toggleSelect}
-          onLoad={schemes.loadScheme}
-          onDelete={schemes.deleteScheme}
+          onLoad={schemes.loadSchemeById}
+          onDelete={schemes.deleteSchemeById}
         />
       </div>
     </div>

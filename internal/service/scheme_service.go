@@ -10,6 +10,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/engine"
 	"github.com/dongying1997/materialcost4/internal/models"
 )
 
@@ -22,9 +23,120 @@ func NewSchemeService(schemeRepo *db.SchemeRepo) *SchemeService {
 	return &SchemeService{schemeRepo: schemeRepo}
 }
 
-// ListSchemes 方案列表。
-func (s *SchemeService) ListSchemes() ([]*models.Scheme, error) {
-	return s.schemeRepo.List()
+// SchemeSummary 方案列表项：方案元信息 + 由内联计算得出的结果摘要。
+//
+// 列表页只关心「哪个方案、最终产物叫什么、单位成本多少」，
+// 不需要每个方案完整的 steps（那是载入时才拉的数据）；顺带省掉把全部
+// steps 序列化传给前端的开销。
+type SchemeSummary struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Note      string    `json:"note"`
+	StepCount int       `json:"stepCount"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	// ---- 结果摘要（来自内联计算，未持久化；方案参数变更后自动跟随）----
+
+	// HasResult 是否算出了结果。false 时列表显示「-」，
+	// 具体原因见 BlockingErrors / Errors。
+	HasResult bool `json:"hasResult"`
+	// ProductName 最终产物名（最后一步主产物的名称）
+	ProductName string `json:"productName"`
+	// UnitCost 最终产物单位成本（元/kg）= 总成本 ÷ 总产量
+	UnitCost float64 `json:"unitCost"`
+	// TotalCost 总成本（元）
+	TotalCost float64 `json:"totalCost"`
+	// TotalYieldKg 总产量（kg）
+	TotalYieldKg float64 `json:"totalYieldKg"`
+	// BlockingErrors 计算被阻塞的原因（如「底物缺少分子量」「底物投料量需大于 0」）
+	BlockingErrors []string `json:"blockingErrors"`
+	// Errors 计算本身失败时的原因（与 BlockingErrors 区分：这是服务层错误）
+	Errors []string `json:"errors"`
+}
+
+// ListSchemes 方案列表（含结果摘要）。
+//
+// 方案只持久化输入、不存计算结果，因此这里对每个方案跑一次纯函数计算取摘要。
+// 这样结果永远与方案内容一致，不会出现「改了方案但列表还是旧单价」的陈旧数据。
+// 计算失败不影响列表本身：原因写进摘要，列表照常返回。
+func (s *SchemeService) ListSchemes() ([]*SchemeSummary, error) {
+	schemes, err := s.schemeRepo.List()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*SchemeSummary, 0, len(schemes))
+	for _, sch := range schemes {
+		out = append(out, summarizeScheme(sch))
+	}
+	return out, nil
+}
+
+// summarizeScheme 由方案算出结果摘要。纯函数，不读物料库。
+func summarizeScheme(sch *models.Scheme) *SchemeSummary {
+	sum := &SchemeSummary{
+		ID: sch.ID, Name: sch.Name, Note: sch.Note,
+		StepCount: len(sch.Steps),
+		CreatedAt: sch.CreatedAt, UpdatedAt: sch.UpdatedAt,
+		BlockingErrors: []string{}, Errors: []string{},
+	}
+	if len(sch.Steps) == 0 {
+		sum.BlockingErrors = append(sum.BlockingErrors, "方案没有任何步骤")
+		return sum
+	}
+	// 注意：CalculateMultiStep 注入继承原料时会写回 steps 的元素
+	// （injectInheritedReagent 里的 step := steps[i] 只复制了切片头，
+	//   step.Reagents[j] 与调用方共享底层数组）。这里不深拷贝是安全的，
+	// 因为 sch.Steps 是 schemeRepo.List() 每次从 JSON 新反序列化出来的副本，
+	// 摘要是算出即弃的，改动不会外泄到别处（与 ReactionService.Calculate 同理）。
+	res := engine.CalculateMultiStep(sch.Steps)
+
+	last := res.Steps[len(res.Steps)-1]
+	if last.PrimaryProduct != nil {
+		sum.ProductName = last.PrimaryProduct.Name
+	} else {
+		// 通常引擎会把未命名的产物回退成「产物」，但用户既没命名、计算又没跑通时
+		// PrimaryProduct 可能是空的，这里直接从输入里取，保证名称与输入一致且不带兜底文案。
+		sum.ProductName = lastProductName(sch.Steps[len(sch.Steps)-1])
+	}
+	sum.TotalCost = res.TotalCost
+	sum.TotalYieldKg = res.TotalYieldKg
+	sum.UnitCost = res.TotalUnitCost
+	// 产量与成本都算得出来，单位成本才有意义：
+	// 只算出产量而成本为 0（没填任何单价），展示「0 元/kg」是误导而不是结果。
+	sum.HasResult = res.TotalYieldKg > 0 && res.TotalCost > 0
+
+	// 收集阻塞原因（各步展开），供列表用 Tooltip 说明为什么算不出来
+	for i, sr := range res.Steps {
+		if sr == nil {
+			continue
+		}
+		for _, e := range sr.BlockingErrors {
+			sum.BlockingErrors = append(sum.BlockingErrors, fmt.Sprintf("步骤 %d：%s", i+1, e))
+		}
+	}
+	// 没有阻塞错误却仍算不出结果时，要区分「产量没算出来」与「成本为 0」，
+	// 否则用户看到「缺少可计算的数据」会去反复检查已经填好的产量参数。
+	if !sum.HasResult && len(sum.BlockingErrors) == 0 {
+		if res.TotalYieldKg <= 0 {
+			sum.BlockingErrors = append(sum.BlockingErrors,
+				"缺少可计算的数据（请填写底物投料量、分子量与产物收率）")
+		} else {
+			sum.BlockingErrors = append(sum.BlockingErrors,
+				"成本为 0：尚未填写任何原料的单价")
+		}
+	}
+	return sum
+}
+
+// lastProductName 取最后一步主产物的名称（未命名时返回空串，由调用方决定如何展示）。
+func lastProductName(step models.ReactionStep) string {
+	for i := range step.Products {
+		if step.Products[i].IsSubstrate {
+			return step.Products[i].Name
+		}
+	}
+	return ""
 }
 
 // GetScheme 获取单个方案。

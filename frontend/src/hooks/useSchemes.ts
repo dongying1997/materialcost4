@@ -3,20 +3,20 @@ import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
 import { Modal } from 'antd'
 import { SchemeService } from '../bindings'
-import type { Scheme, SchemePayload, StepRow } from '../types'
+import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '../types'
 import { stepsToPayload, stepsFromScheme, newStep } from '../utils/reaction'
 import { fileToBase64 } from '../utils/file'
 
 // 定义SchemeApi接口
 export interface SchemeApi {
-  schemes: Scheme[]
+  schemes: SchemeSummary[]
   selectedIds: number[]
   exporting: boolean
   importing: boolean
   loadSchemes: () => void
   saveScheme: (name: string, note: string, steps: StepRow[]) => Promise<boolean>
-  loadScheme: (sch: Scheme) => Promise<void>
-  deleteScheme: (sch: Scheme) => Promise<void>
+  loadSchemeById: (id: number) => Promise<void>
+  deleteSchemeById: (id: number) => Promise<void>
   toggleSelect: (id: number) => void
   clearSelection: () => void
   exportSchemes: (ids: number[]) => Promise<void>
@@ -33,7 +33,7 @@ export function useSchemes(
   messageApi: MessageInstance,
   onLoaded: (rows: StepRow[]) => void,
 ): SchemeApi {
-  const [schemes, setSchemes] = useState<Scheme[]>([])
+  const [schemes, setSchemes] = useState<SchemeSummary[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -42,7 +42,7 @@ export function useSchemes(
   const loadSchemes = useCallback(async () => {
     try {
       const data = await SchemeService.ListSchemes()
-      setSchemes((data || []) as Scheme[])
+      setSchemes((data || []) as SchemeSummary[])
     } catch (e) {
       messageApi.error(String(e))
     }
@@ -66,9 +66,10 @@ export function useSchemes(
     }
   }
 
-  const loadScheme = async (sch: Scheme) => {
+  // 列表项只有摘要（不含 steps），完整方案在载入时才拉取
+  const loadSchemeById = async (id: number) => {
     try {
-      const full = await SchemeService.GetScheme(sch.id)
+      const full = await SchemeService.GetScheme(id)
       if (!full) return
       const rows = stepsFromScheme(full.steps)
       onLoaded(rows.length ? rows : [newStep()])
@@ -78,11 +79,11 @@ export function useSchemes(
     }
   }
 
-  const deleteScheme = async (sch: Scheme) => {
+  const deleteSchemeById = async (id: number) => {
     try {
-      await SchemeService.DeleteScheme(sch.id)
+      await SchemeService.DeleteScheme(id)
       messageApi.success('已删除')
-      setSelectedIds((prev) => prev.filter((id) => id !== sch.id))
+      setSelectedIds((prev) => prev.filter((x) => x !== id))
       loadSchemes()
     } catch (e) {
       messageApi.error(String(e))
@@ -152,7 +153,7 @@ export function useSchemes(
 
   return {
     schemes, selectedIds, exporting, importing,
-    loadSchemes, saveScheme, loadScheme, deleteScheme,
+    loadSchemes, saveScheme, loadSchemeById, deleteSchemeById,
     toggleSelect, clearSelection, exportSchemes, importSchemes, deleteSelected,
   }
 }

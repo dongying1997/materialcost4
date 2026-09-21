@@ -7,7 +7,7 @@ import type {
   StepResult, ReagentResult, ProductResult, IntermediateProduct,
 } from '../bindings/github.com/dongying1997/materialcost4/internal/engine/models'
 import type {
-  MaterialPriceOption, ImportResult, CalculateResult,
+  MaterialPriceOption, ImportResult, CalculateResult, SchemeSummary,
 } from '../bindings/github.com/dongying1997/materialcost4/internal/service/models'
 
 /**
@@ -22,6 +22,7 @@ export type {
   Material, MaterialWithPrice, Price, ReactionStep, ReagentInput,
   ProductInput, Scheme, PriceSnapshot, StepResult, ReagentResult,
   ProductResult, MaterialPriceOption, ImportResult, IntermediateProduct,
+  SchemeSummary,
 }
 
 // ---- 前端编辑器行类型（在 bindings 基础上扩展 _key 与价格选项）----

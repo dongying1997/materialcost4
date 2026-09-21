@@ -87,8 +87,8 @@ function ReactionPage() {
         onSaveCancel={() => setSaveOpen(false)}
         onSaveOk={doSaveScheme}
         onLoadClose={() => setLoadOpen(false)}
-        onLoad={schemes.loadScheme}
-        onDelete={schemes.deleteScheme}
+        onLoad={schemes.loadSchemeById}
+        onDelete={schemes.deleteSchemeById}
       />
     </div>
   )

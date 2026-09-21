@@ -1,18 +1,18 @@
 import { Modal, Form, Input, List, Button, Popconfirm } from 'antd'
 import { FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { FormInstance } from 'antd'
-import type { Scheme } from '../types'
+import type { SchemeSummary } from '../types'
 
 interface Props {
   saveOpen: boolean
   loadOpen: boolean
   form: FormInstance
-  schemes: Scheme[]
+  schemes: SchemeSummary[]
   onSaveCancel: () => void
   onSaveOk: () => void
   onLoadClose: () => void
-  onLoad: (sch: Scheme) => void
-  onDelete: (sch: Scheme) => void
+  onLoad: (id: number) => void
+  onDelete: (id: number) => void
 }
 
 /** 保存方案与载入方案两个弹窗 */
@@ -36,12 +36,12 @@ function SchemeModals({ saveOpen, loadOpen, form, schemes, onSaveCancel, onSaveO
           renderItem={(s) => (
             <List.Item actions={[
               <Button key="l" type="primary" size="small" icon={<FolderOpenOutlined />}
-                onClick={() => onLoad(s)}>载入</Button>,
-              <Popconfirm key="d" title="删除？" onConfirm={() => onDelete(s)}>
+                onClick={() => onLoad(s.id)}>载入</Button>,
+              <Popconfirm key="d" title="删除？" onConfirm={() => onDelete(s.id)}>
                 <Button size="small" danger type="link" icon={<DeleteOutlined />}>删除</Button>
               </Popconfirm>,
             ]}>
-              <List.Item.Meta title={s.name} description={`${s.steps?.length || 0} 步`} />
+              <List.Item.Meta title={s.name} description={`${s.stepCount} 步`} />
             </List.Item>
           )}
         />

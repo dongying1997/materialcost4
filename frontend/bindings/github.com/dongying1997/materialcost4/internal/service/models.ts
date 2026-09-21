@@ -103,3 +103,55 @@ export interface SchemeImportResult {
     "imported": number;
     "errors": string[] | null;
 }
+
+/**
+ * SchemeSummary 方案列表项：方案元信息 + 由内联计算得出的结果摘要。
+ * 
+ * 列表页只关心「哪个方案、最终产物叫什么、单位成本多少」，
+ * 不需要每个方案完整的 steps（那是载入时才拉的数据）；顺带省掉把全部
+ * steps 序列化传给前端的开销。
+ */
+export interface SchemeSummary {
+    "id": number;
+    "name": string;
+    "note": string;
+    "stepCount": number;
+    "createdAt": string;
+    "updatedAt": string;
+
+    /**
+     * HasResult 是否算出了结果。false 时列表显示「-」，
+     * 具体原因见 BlockingErrors / Errors。
+     */
+    "hasResult": boolean;
+
+    /**
+     * ProductName 最终产物名（最后一步主产物的名称）
+     */
+    "productName": string;
+
+    /**
+     * UnitCost 最终产物单位成本（元/kg）= 总成本 ÷ 总产量
+     */
+    "unitCost": number;
+
+    /**
+     * TotalCost 总成本（元）
+     */
+    "totalCost": number;
+
+    /**
+     * TotalYieldKg 总产量（kg）
+     */
+    "totalYieldKg": number;
+
+    /**
+     * BlockingErrors 计算被阻塞的原因（如「底物缺少分子量」「底物投料量需大于 0」）
+     */
+    "blockingErrors": string[] | null;
+
+    /**
+     * Errors 计算本身失败时的原因（与 BlockingErrors 区分：这是服务层错误）
+     */
+    "errors": string[] | null;
+}

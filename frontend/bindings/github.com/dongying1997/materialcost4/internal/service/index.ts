@@ -18,5 +18,6 @@ export type {
     ImportResult,
     MaterialPriceOption,
     SchemeExportFile,
-    SchemeImportResult
+    SchemeImportResult,
+    SchemeSummary
 } from "./models.js";

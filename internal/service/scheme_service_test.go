@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dongying1997/materialcost4/internal/db"
+	"github.com/dongying1997/materialcost4/internal/engine"
 	"github.com/dongying1997/materialcost4/internal/models"
 )
 
@@ -357,5 +358,163 @@ func TestCrossMachineSimulation(t *testing.T) {
 	snap := list[0].Steps[0].Reagents[0].Price
 	if snap == nil || snap.Supplier != "旧供应商" || snap.Date != "2024-01-01" {
 		t.Errorf("价格快照的供应商/日期丢失: %+v", snap)
+	}
+}
+
+// ---- ListSchemes 结果摘要 ----
+
+// TestListSchemesSummary 摘要应给出最终产物名与单位成本，且与引擎计算一致。
+func TestListSchemesSummary(t *testing.T) {
+	svc, repo := newSchemeSvc(t)
+
+	steps := []models.ReactionStep{{
+		StepNum: 1,
+		Reagents: []models.ReagentInput{{
+			Name: "甲醇", MolWeight: 32.04, Content: 100, IsSubstrate: true, AmountKg: f(1),
+			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10},
+		}},
+		Products: []models.ProductInput{
+			{Name: "目标产物", MolWeight: 46.07, IsSubstrate: true, WeightYield: f(80)},
+		},
+	}}
+	sch := sampleScheme(0, "有结果的方案")
+	sch.Steps = steps
+	if _, err := repo.Insert(sch); err != nil {
+		t.Fatal(err)
+	}
+	// 再存一个参数不全的：底物没填投料量，应算不出结果
+	bad := sampleScheme(0, "缺数据的方案")
+	bad.Steps = []models.ReactionStep{{
+		StepNum:  1,
+		Reagents: []models.ReagentInput{{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true}},
+		Products: []models.ProductInput{{Name: "P", MolWeight: 150, IsSubstrate: true, WeightYield: f(80)}},
+	}}
+	if _, err := repo.Insert(bad); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.ListSchemes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("期望 2 条摘要，得到 %d", len(list))
+	}
+	byName := map[string]*SchemeSummary{}
+	for _, s := range list {
+		byName[s.Name] = s
+	}
+
+	// 与引擎直接计算的结果对齐，避免摘要算错口径
+	want := engine.CalculateMultiStep(steps)
+	ok := byName["有结果的方案"]
+	if ok == nil {
+		t.Fatal("缺少「有结果的方案」")
+	}
+	if !ok.HasResult {
+		t.Fatalf("应算出结果，blocking=%v errors=%v", ok.BlockingErrors, ok.Errors)
+	}
+	if ok.ProductName != "目标产物" {
+		t.Errorf("产物名 = %q，期望「目标产物」", ok.ProductName)
+	}
+	if ok.UnitCost != want.TotalUnitCost {
+		t.Errorf("单位成本 = %v，期望 %v（引擎值）", ok.UnitCost, want.TotalUnitCost)
+	}
+	if ok.TotalCost != want.TotalCost || ok.TotalYieldKg != want.TotalYieldKg {
+		t.Errorf("总成本/总产量 = %v/%v，期望 %v/%v",
+			ok.TotalCost, ok.TotalYieldKg, want.TotalCost, want.TotalYieldKg)
+	}
+	if ok.StepCount != 1 {
+		t.Errorf("步数 = %d，期望 1", ok.StepCount)
+	}
+
+	// 缺数据的方案：不该算出结果，且必须给出原因
+	bad2 := byName["缺数据的方案"]
+	if bad2 == nil {
+		t.Fatal("缺少「缺数据的方案」")
+	}
+	if bad2.HasResult {
+		t.Error("参数不全的方案不应算出结果")
+	}
+	if len(bad2.BlockingErrors) == 0 {
+		t.Error("算不出结果时必须给出阻塞原因，供列表 Tooltip 展示")
+	}
+
+	// 摘要按 updated_at 倒序返回（与 repo.List 一致），只是顺序不定，这里只校验集合完整
+	if list[0].Name != "缺数据的方案" && list[1].Name != "缺数据的方案" {
+		t.Error("列表应同时包含两个方案")
+	}
+}
+
+// TestListSchemesEmptySteps 没有步骤的方案不应让列表接口报错。
+func TestListSchemesEmptySteps(t *testing.T) {
+	svc, repo := newSchemeSvc(t)
+	if _, err := repo.Insert(sampleScheme(0, "空方案")); err != nil {
+		t.Fatal(err)
+	}
+	list, err := svc.ListSchemes()
+	if err != nil {
+		t.Fatalf("空方案不应让列表失败: %v", err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("期望 1 条，得到 %d", len(list))
+	}
+	if list[0].HasResult {
+		t.Error("空方案不应有结果")
+	}
+	if len(list[0].BlockingErrors) == 0 {
+		t.Error("空方案应给出原因")
+	}
+}
+
+// TestListSchemesDoesNotMutateStored 摘要计算会注入继承原料，不能污染库中方案。
+func TestListSchemesDoesNotMutateStored(t *testing.T) {
+	svc, repo := newSchemeSvc(t)
+	sch := sampleScheme(0, "两步方案")
+	sch.Steps = []models.ReactionStep{
+		{
+			StepNum: 1,
+			Reagents: []models.ReagentInput{{
+				Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1),
+				Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10},
+			}},
+			Products: []models.ProductInput{{Name: "中间体", MolWeight: 120, IsSubstrate: true, WeightYield: f(90)}},
+		},
+		{
+			StepNum: 2,
+			// 继承行当底物时仍需填投料量，否则引擎会判「底物投料量需大于 0」
+			Reagents: []models.ReagentInput{{Name: "中间体", MolWeight: 120, Inherited: true, IsSubstrate: true, AmountKg: f(0.45)}},
+			Products: []models.ProductInput{{Name: "终产物", MolWeight: 180, IsSubstrate: true, WeightYield: f(70)}},
+		},
+	}
+	id, err := repo.Insert(sch)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.ListSchemes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || !list[0].HasResult {
+		t.Fatalf("两步方案应算出结果: hasResult=%v product=%q cost=%v yield=%v blocking=%v errors=%v",
+			list[0].HasResult, list[0].ProductName, list[0].TotalCost, list[0].TotalYieldKg,
+			list[0].BlockingErrors, list[0].Errors)
+	}
+	if list[0].ProductName != "终产物" {
+		t.Errorf("最终产物名 = %q，期望「终产物」（最后一步的主产物）", list[0].ProductName)
+	}
+
+	// 库里那份必须还是原样：继承行的分子量/单价是计算期注入的，不该被持久化
+	stored, err := repo.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inh := stored.Steps[1].Reagents[0]
+	if inh.Price != nil {
+		t.Error("列表计算不得把注入的价格快照写回库中方案")
+	}
+	if inh.Name != "中间体" || inh.MolWeight != 120 {
+		t.Error("库中方案的继承行不应被摘要计算改动")
 	}
 }

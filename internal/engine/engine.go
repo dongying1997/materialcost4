@@ -77,7 +77,7 @@ func CalculateStep(step models.ReactionStep, prevProduct *IntermediateProduct) *
 				if pr.ActualYieldKg > 0 {
 					primaryYield = pr.ActualYieldKg
 					res.PrimaryProduct = &IntermediateProduct{
-						Name:        productName(&step.Products[i]),
+						Name:        nameOfP(&step.Products[i]),
 						MolWeight:   step.Products[i].MolWeight,
 						UnitCost:    pr.UnitCost,
 						ActualYield: pr.ActualYieldKg,
@@ -341,5 +341,3 @@ func nameOfP(p *models.ProductInput) string {
 	}
 	return "产物"
 }
-
-func productName(p *models.ProductInput) string { return nameOfP(p) }

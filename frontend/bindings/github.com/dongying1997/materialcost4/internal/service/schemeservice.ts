@@ -67,9 +67,13 @@ export function ImportSchemesFromFile(): $CancellablePromise<$models.SchemeImpor
 }
 
 /**
- * ListSchemes 方案列表。
+ * ListSchemes 方案列表（含结果摘要）。
+ * 
+ * 方案只持久化输入、不存计算结果，因此这里对每个方案跑一次纯函数计算取摘要。
+ * 这样结果永远与方案内容一致，不会出现「改了方案但列表还是旧单价」的陈旧数据。
+ * 计算失败不影响列表本身：原因写进摘要，列表照常返回。
  */
-export function ListSchemes(): $CancellablePromise<(models$0.Scheme | null)[] | null> {
+export function ListSchemes(): $CancellablePromise<($models.SchemeSummary | null)[] | null> {
     return $Call.ByID(3819372074);
 }
 
