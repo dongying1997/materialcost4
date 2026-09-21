@@ -32,6 +32,9 @@ function MaterialsPage() {
           onEdit={m.openEdit}
           onDelete={m.deleteMaterial}
           onPrice={m.openPrice}
+          current={m.current}
+          pageSize={m.pageSize}
+          onPageChange={m.onPageChange}
         />
       </div>
       <MaterialEditModal

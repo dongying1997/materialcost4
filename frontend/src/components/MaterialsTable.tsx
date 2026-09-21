@@ -4,7 +4,6 @@ import { HistoryOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons
 import type { ColumnsType } from 'antd/es/table'
 import type { MaterialWithPrice } from '../types'
 import { fmtMoney } from '../utils/file'
-import { usePersistedState } from '../hooks/useStorage'
 
 interface Props {
   list: MaterialWithPrice[]
@@ -12,18 +11,19 @@ interface Props {
   onEdit: (m: MaterialWithPrice) => void
   onDelete: (m: MaterialWithPrice) => void
   onPrice: (m: MaterialWithPrice) => void
+  /** 分页状态由 useMaterials 持有（新增物料后要拨回第一页），这里只负责渲染与回调 */
+  current: number
+  pageSize: number
+  onPageChange: (page: number, size: number) => void
 }
 
 /** 物料列表表格：含当前价格与操作列 */
-function MaterialsTable({ list, loading, onEdit, onDelete, onPrice }: Props) {
-  const [pageSize, setPageSize] = usePersistedState("pageSize", 20)
-  const [current, setCurrent] = usePersistedState("current", 1)
+function MaterialsTable({ list, loading, onEdit, onDelete, onPrice, current, pageSize, onPageChange }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   /** 切换页码后把可滚动区域滚回顶部，避免停留在新页底部 */
   const handlePageChange = (page: number, size: number) => {
-    setCurrent(page)
-    setPageSize(size)
+    onPageChange(page, size)
     scrollRef.current?.scrollTo({ top: 0 })
   }
 

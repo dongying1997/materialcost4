@@ -113,15 +113,41 @@ func (r *MaterialRepo) Get(id int64) (*models.Material, error) {
 
 // List 搜索物料：按 编码/名称/CAS/化学式/备注 模糊匹配。
 // 备注也参与匹配，是为了让别名可搜——导入时同一物质的其它写法会记在备注里。
+//
+// 排序分两种情形：
+//   - 无关键字：最新新增的在前（id DESC）。这样刚建的物料必定落在第一页，
+//     不必去翻字母序里它该待的那一页。
+//   - 有关键字：与关键字的接近度高的在前（精确 > 前缀 > 包含），同级再按最新在前。
+//     纯字母序在搜索结果里没有意义——用户是带着一个具体查询来的，
+//     最想要的是「哪个才是我要找的那条」，而不是它们按名称怎么排。
 func (r *MaterialRepo) List(keyword string) ([]*models.Material, error) {
-	q := `SELECT id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at FROM materials`
+	const cols = `id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at`
+	q := `SELECT ` + cols + ` FROM materials`
+	k := strings.TrimSpace(keyword)
+
 	var args []any
-	if k := strings.TrimSpace(keyword); k != "" {
-		q += ` WHERE code LIKE ? OR name LIKE ? OR cas LIKE ? OR formula LIKE ? OR note LIKE ?`
+	if k == "" {
+		q += ` ORDER BY id DESC`
+	} else {
+		// 接近度打分：0 = 编码/名称/CAS 精确等于关键字，1 = 前缀，2 = 包含。
+		// 编码/CAS 是标识符，精确匹配的价值最高；名称次之。
+		// 备注与化学式只参与「包含」这一档（它们是辅助信息，不该压过名称前缀匹配）。
+		q += `
+		WHERE code LIKE ? OR name LIKE ? OR cas LIKE ? OR formula LIKE ? OR note LIKE ?
+		ORDER BY CASE
+			WHEN code = ? OR name = ? OR cas = ? THEN 0
+			WHEN code LIKE ? OR name LIKE ? OR cas LIKE ? THEN 1
+			ELSE 2
+		END, id DESC`
 		like := "%" + k + "%"
-		args = []any{like, like, like, like, like}
+		prefix := k + "%"
+		args = []any{
+			like, like, like, like, like,
+			k, k, k,
+			prefix, prefix, prefix,
+		}
 	}
-	q += ` ORDER BY name`
+
 	rows, err := r.db.Query(q, args...)
 	if err != nil {
 		return nil, err

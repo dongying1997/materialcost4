@@ -5,6 +5,7 @@ import { Form, Modal } from 'antd'
 import { MaterialService, ExcelService } from '../bindings'
 import type { Material, MaterialPayload, MaterialWithPrice, Price, PricePayload } from '../types'
 import { fileToBase64 } from '../utils/file'
+import { usePersistedState } from './useStorage'
 import dayjs from 'dayjs'
 
 export interface MaterialsApi {
@@ -34,6 +35,10 @@ export interface MaterialsApi {
   closeClear: () => void
   doClear: () => Promise<void>
   openPrice: (m: MaterialWithPrice | null) => void
+  /** 分页状态提到这里持有：新增物料后要回第一页，跨组件手改 localStorage 太脆 */
+  current: number
+  pageSize: number
+  onPageChange: (page: number, size: number) => void
 }
 
 /** 物料库数据与业务逻辑：列表查询、增删改、Excel 导入、价格抽屉 */
@@ -49,6 +54,10 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const [exportOpen, setExportOpen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
   const [form] = Form.useForm()
+  // 分页（持久化）：新增物料后要把页码拨回 1，否则用户停在第二页时
+  // 看不到刚建的物料——列表已按「最新在前」排序，但那只保证它在第一页。
+  const [pageSize, setPageSize] = usePersistedState('pageSize', 20)
+  const [current, setCurrent] = usePersistedState('current', 1)
 
   const load = useCallback(async (kw = keyword) => {
     setLoading(true)
@@ -66,6 +75,8 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
 
   const search = (kw: string) => {
     setKeyword(kw)
+    // 搜索结果通常比全量少得多，停在第 5 页会直接显示空表，看着像「搜不到」
+    setCurrent(1)
     load(kw)
   }
   const refresh = () => load()
@@ -148,6 +159,7 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
         }
       } else {
         messageApi.success(editing ? '物料已更新' : '物料已新增')
+        if (!editing) setCurrent(1) // 新物料在第 1 页顶部，把视图带过去
       }
       setEditOpen(false)
       load()
@@ -231,11 +243,17 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
 
   const openPrice = (m: MaterialWithPrice | null) => setDrawerMaterial(m)
 
+  const onPageChange = (page: number, size: number) => {
+    setCurrent(page)
+    setPageSize(size)
+  }
+
   return {
     list, loading, importing, exporting, exportOpen, clearOpen, form,
     editOpen, editing, drawerMaterial,
     search, refresh, openCreate, openEdit, closeEdit,
     saveMaterial, deleteMaterial, onImport, downloadTemplate,
     openExport, closeExport, doExport, openClear, closeClear, doClear, openPrice,
+    current, pageSize, onPageChange,
   }
 }
