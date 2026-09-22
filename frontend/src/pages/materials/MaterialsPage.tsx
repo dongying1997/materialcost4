@@ -2,7 +2,7 @@ import { message } from 'antd'
 import { useMaterials } from '@/pages/materials/useMaterials'
 import MaterialsToolbar from '@/pages/materials/components/MaterialsToolbar'
 import MaterialsTable from '@/pages/materials/components/MaterialsTable'
-import MaterialEditModal from '@/pages/materials/components/MaterialEditModal'
+import MaterialEditModal from '@/shared/components/MaterialEditModal'
 import PriceDrawer from '@/pages/materials/components/PriceDrawer'
 import ExportModal from '@/pages/materials/components/ExportModal'
 import ClearMaterialsModal from '@/pages/materials/components/ClearMaterialsModal'
@@ -19,7 +19,7 @@ function MaterialsPage() {
         importing={m.importing}
         exporting={m.exporting}
         onSearch={m.search}
-        onCreate={m.openCreate}
+        onCreate={m.materialEditor.create}
         onImport={m.onImport}
         onDownloadTemplate={m.downloadTemplate}
         onExport={m.openExport}
@@ -38,11 +38,11 @@ function MaterialsPage() {
         />
       </div>
       <MaterialEditModal
-        open={m.editOpen}
-        editing={m.editing}
-        form={m.form}
-        onOk={m.saveMaterial}
-        onCancel={m.closeEdit}
+        open={m.materialEditor.open}
+        editing={m.materialEditor.editing}
+        form={m.materialEditor.form}
+        onOk={m.materialEditor.save}
+        onCancel={m.materialEditor.close}
       />
       <PriceDrawer
         material={m.drawerMaterial}

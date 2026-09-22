@@ -8,6 +8,8 @@ import CalcToolbar from '@/pages/reaction/components/CalcToolbar'
 import SchemeImageBox from '@/pages/reaction/components/SchemeImageBox'
 import SchemeModals from '@/pages/reaction/components/SchemeModals'
 import { chainMultipliers } from '@/lib/reaction'
+import { useMaterialEditor } from '@/shared/hooks/useMaterialEditor'
+import MaterialEditModal from '@/shared/components/MaterialEditModal'
 import type { SchemeMeta } from '@/shared/hooks/useSchemes'
 import { usePasteImage } from '@/pages/reaction/usePasteImage'
 import type { Scheme, StepRow, StepResult } from '@/types'
@@ -57,6 +59,10 @@ function ReactionPage() {
   const schemes = useSchemes(messageApi, handleLoaded)
 
   const paste = usePasteImage({ onImage: calc.setImage })
+
+  // 新增物料：落库后要重新拉一遍物料库，否则刚建的物料不会出现在名称列的下拉候选里。
+  // 这里只用新增（create），编辑物料仍在物料库页——反应计算页没有「编辑已有物料」的入口。
+  const materialEditor = useMaterialEditor(messageApi, () => { calc.reloadMaterials() })
 
   /**
    * 落库成功后把「当前方案」切到那一行——新建完就不再是未保存状态了。
@@ -124,6 +130,7 @@ function ReactionPage() {
         <CalcToolbar
           calculating={calc.calculating}
           onAddStep={calc.addStep}
+          onAddMaterial={materialEditor.create}
           onSave={handleSave}
           onRenameSave={handleRenameSave}
           onSaveAs={handleSaveAs}
@@ -156,6 +163,14 @@ function ReactionPage() {
           />
         ))}
       </div>
+
+      <MaterialEditModal
+        open={materialEditor.open}
+        editing={materialEditor.editing}
+        form={materialEditor.form}
+        onOk={materialEditor.save}
+        onCancel={materialEditor.close}
+      />
 
       <SchemeModals
         saveOpen={saveOpen}

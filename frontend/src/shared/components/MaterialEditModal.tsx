@@ -1,7 +1,7 @@
 import { ConfigProvider, Modal } from 'antd'
 import type { FormInstance } from 'antd'
 import type { Material } from '@/types'
-import MaterialForm from '@/pages/materials/components/MaterialForm'
+import MaterialForm from '@/shared/components/MaterialForm'
 
 interface Props {
   open: boolean
@@ -11,7 +11,7 @@ interface Props {
   onCancel: () => void
 }
 
-/** 新增 / 编辑物料弹窗 */
+/** 新增 / 编辑物料弹窗。物料库页两种形态都用，反应计算页只用「新增」 */
 function MaterialEditModal({ open, editing, form, onOk, onCancel }: Props) {
   return (
     // 这一层 ConfigProvider 只作用于本弹窗里的表单：把 antd 默认的 24px

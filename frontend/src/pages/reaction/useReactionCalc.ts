@@ -33,6 +33,8 @@ export interface ReactionCalcApi {
   setImage: (v: string) => void
   recalculate: () => void
   ensurePriceOptions: (materialId: number) => void
+  /** 重新拉取物料库。新增物料后调用，否则新物料不在下拉候选里 */
+  reloadMaterials: () => void
 }
 
 /** 反应计算主状态：步骤编辑行、物料库、计算结果与实时计算（步骤内容持久化到 localStorage） */
@@ -150,6 +152,6 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   return {
     steps, setSteps, materials, result, calculating,
     updateStep, addStep, removeStep, moveStep, clearAll, image, setImage,
-    recalculate, ensurePriceOptions,
+    recalculate, ensurePriceOptions, reloadMaterials: loadMaterials,
   }
 }

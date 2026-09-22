@@ -2,13 +2,15 @@ import { Button, Tooltip, Dropdown, Space } from 'antd'
 import {
   PlusOutlined, SaveOutlined, FolderOpenOutlined, CopyOutlined,
   DeleteOutlined, ReloadOutlined, PictureOutlined, ClearOutlined, EditOutlined,
-  DownOutlined,
+  DownOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import ToolbarStrip from '@/shared/components/ToolbarStrip'
 
 interface Props {
   calculating: boolean
   onAddStep: () => void
+  /** 新增物料入库。物料库中没有的原料，在这里补建，不必切到物料库页 */
+  onAddMaterial: () => void
   onSave: () => void
   /** 已落库时：打开名称/备注弹窗，改完写回原行 */
   onRenameSave: () => void
@@ -29,12 +31,17 @@ interface Props {
 
 /** 计算工具栏：步骤与方案的增删改操作（汇总统计在 StepCard 标题栏里） */
 function CalcToolbar({
-  calculating, onAddStep, onSave, onRenameSave, onSaveAs, savedName, onLoad,
+  calculating, onAddStep, onAddMaterial, onSave, onRenameSave, onSaveAs, savedName, onLoad,
   onRecalculate, onClear, onPasteImage, onRemoveImage, hasImage,
 }: Props) {
   return (
     <ToolbarStrip>
       <Button type="primary" icon={<PlusOutlined />} onClick={onAddStep}>添加步骤</Button>
+      {/* 紧挨「添加步骤」：两者都是「新建」动作，挨着放最容易找。
+          新物料落进物料库，名称列与「选物料」列的下拉随即就能选到它。 */}
+      <Tooltip title='物料库中没有的物料，在这里直接新增'>
+        <Button icon={<ExperimentOutlined />} onClick={onAddMaterial}>新增物料</Button>
+      </Tooltip>
       {/* 分裂按钮：主体是「保存」这个动作本身（已落库的写回原行，未落库的开弹窗命名），
           右侧箭头才展开菜单里的「重命名并保存」——那是唯一还能改到方案名称的入口。
           不用 Dropdown.Button：antd 6 已废弃它，官方替代就是 Space.Compact 这套。 */}

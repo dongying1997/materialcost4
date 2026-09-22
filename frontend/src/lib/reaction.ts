@@ -1,6 +1,7 @@
 // 反应计算的辅助函数：步骤对象构造与前后端数据序列化
 import type {
   StepRow, MultiStepResult, ReactionStep, MaterialPriceOption, PriceSnapshot, DecStr,
+  ReagentRow, ProductRow, MaterialPayload,
 } from '@/types'
 import { normalize, toNumber } from '@/shared/utils/decimal'
 
@@ -43,22 +44,50 @@ export function uid(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${keySeq.toString(36)}`
 }
 
+/**
+ * 空白的物料行。
+ *
+ * 返回的是原料行与产物行字段的**并集**（`ReagentRow & ProductRow`）：新建一张
+ * 空白行的场景下，两边的字段是同一套初值，各写一份必然会慢慢分叉。调用方按
+ * 自己那一侧去用即可——并集赋值给任一侧都成立。
+ */
+export function newMaterialRow(opts: {
+  key: string
+  isSubstrate: boolean
+}): ReagentRow & ProductRow {
+  return {
+    _key: opts.key,
+    materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
+    isSubstrate: opts.isSubstrate,
+    content: '100', recoveryRate: '0', equiv: null, amountKg: null,
+    price: null, priceOptions: [], latestPrice: null,
+    molarRatio: '1', weightYield: null, molarYield: null, actualYield: null,
+  }
+}
+
 /** 创建一个空步骤（含一个默认原料与产物） */
 export function newStep(): StepRow {
   return {
     _key: uid('s'),
     id: 0, stepNum: 1, name: '',
-    reagents: [{
-      _key: uid('r'),
-      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
-      content: '100', recoveryRate: '0', isSubstrate: true, equiv: null, amountKg: null,
-      price: null, priceOptions: [], latestPrice: null,
-    }],
-    products: [{
-      _key: uid('p'),
-      materialId: 0, inherited: false, name: '', cas: '', formula: '', molWeight: '0',
-      isSubstrate: true, molarRatio: '1', weightYield: null, molarYield: null, actualYield: null,
-    }],
+    reagents: [newMaterialRow({ key: uid('r'), isSubstrate: true })],
+    products: [newMaterialRow({ key: uid('p'), isSubstrate: true })],
+  }
+}
+
+/**
+ * 物料表单 → 落库负载。
+ * 新建物料与反应计算页的「新增物料」共用这一份映射，两处的字段处理不会各走各的。
+ */
+export function materialToPayload(values: Record<string, unknown>, id = 0): MaterialPayload {
+  const str = (k: string) => String(values[k] ?? '')
+  const num = (k: string) => Number(values[k] ?? 0)
+  return {
+    id,
+    code: str('code'), name: str('name'), cas: str('cas'),
+    formula: str('formula'), molWeight: num('molWeight'),
+    content: num('content'), recoveryRate: num('recoveryRate'),
+    note: str('note'),
   }
 }
 

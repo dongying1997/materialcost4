@@ -1,12 +1,13 @@
 // 物料库：列表查询、增删改、Excel 导入、价格抽屉状态
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
-import { Form, Modal } from 'antd'
+import { Modal } from 'antd'
 import { MaterialService, ExcelService } from '@/lib/bindings'
-import type { Material, MaterialPayload, MaterialWithPrice, Price, PricePayload } from '@/types'
+import type { MaterialWithPrice } from '@/types'
 import { fileToBase64 } from '@/shared/utils/file'
 import { usePersistedState } from '@/shared/hooks/useStorage'
-import dayjs from 'dayjs'
+import { useMaterialEditor } from '@/shared/hooks/useMaterialEditor'
+import type { MaterialEditorApi } from '@/shared/hooks/useMaterialEditor'
 
 export interface MaterialsApi {
   list: MaterialWithPrice[]
@@ -15,16 +16,12 @@ export interface MaterialsApi {
   exporting: boolean
   exportOpen: boolean
   clearOpen: boolean
-  form: ReturnType<typeof Form.useForm>[0]
-  editOpen: boolean
-  editing: Material | null
   drawerMaterial: MaterialWithPrice | null
+  /** 物料新增 / 编辑：表单、弹窗与落库全在 useMaterialEditor 里，这里只透出给页面 */
+  materialEditor: MaterialEditorApi
   search: (kw: string) => void
   refresh: () => void
-  openCreate: () => void
   openEdit: (m: MaterialWithPrice) => void
-  closeEdit: () => void
-  saveMaterial: () => Promise<void>
   deleteMaterial: (m: MaterialWithPrice) => Promise<void>
   onImport: (file: File) => Promise<boolean>
   downloadTemplate: () => Promise<void>
@@ -46,14 +43,11 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   const [keyword, setKeyword] = useState('')
   const [list, setList] = useState<MaterialWithPrice[]>([])
   const [loading, setLoading] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editing, setEditing] = useState<Material | null>(null)
   const [drawerMaterial, setDrawerMaterial] = useState<MaterialWithPrice | null>(null)
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
-  const [form] = Form.useForm()
   // 分页（持久化）：新增物料后要把页码拨回 1，否则用户停在第二页时
   // 看不到刚建的物料——列表已按「最新在前」排序，但那只保证它在第一页。
   const [pageSize, setPageSize] = usePersistedState('pageSize', 20)
@@ -81,94 +75,22 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   }
   const refresh = () => load()
 
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    // 价格的单位给个默认值（与价格抽屉一致），其余留空由用户按需填
-    form.setFieldsValue({ priceUnit: '元/kg' })
-    setEditOpen(true)
-  }
+  // 新增 / 编辑走共享 hook。回调拿得到这次保存的物料：
+  // 新建的 id 是刚拿到的自增 id，编辑的则早就在 list 里——据此分辨是哪种模式，
+  // 不必去读 hook 内部的 editing 状态。新增时还要把页码拨回第 1 页，
+  // 否则列表按「最新在前」排序、新物料在第 1 页顶部，停在第二页会看不到它。
+  const materialEditor = useMaterialEditor(messageApi, (saved) => {
+    const isNew = !saved || !rowsRef.current.some((r) => r.id === saved.id)
+    if (isNew) setCurrent(1)
+    load()
+  })
 
-  const openEdit = (m: MaterialWithPrice) => {
-    setEditing(m)
-    form.setFieldsValue({
-      code: m.code, name: m.name, cas: m.cas, formula: m.formula,
-      molWeight: m.molWeight, content: m.content, recoveryRate: m.recoveryRate,
-      note: m.note,
-    })
-    setEditOpen(true)
-  }
-  const closeEdit = () => setEditOpen(false)
+  // 列表快照：上面的回调用它判断「这条物料是不是新出现的」。
+  // 直接闭包捕获 list 会拿到渲染那一刻的旧值，故用 ref 跟随最新。
+  const rowsRef = useRef<MaterialWithPrice[]>([])
+  rowsRef.current = list
 
-  const saveMaterial = async () => {
-    const values = await form.validateFields()
-    const payload: MaterialPayload = {
-      id: editing?.id || 0,
-      code: values.code || '', name: values.name, cas: values.cas || '',
-      formula: values.formula || '', molWeight: values.molWeight || 0,
-      content: values.content || 0, recoveryRate: values.recoveryRate || 0,
-      note: values.note || '',
-    }
-
-    // 价格整体可选：只有用户真的动了价格表单才处理。
-    // 判据只看价格块自己的字段（都以 price 开头），刻意不含：
-    //   - 物料自身的字段（名称/分子量/含量 等），那是建物料的信号，不是填价格的信号
-    //   - priceUnit：它带默认值「元/kg」，有值不代表用户填过价格
-    // 注意价格块的「含量(%)」命名成 priceContent 而不是 content，两者分属两块表单，
-    // 同名会互相覆盖。
-    const touchedPrice = editing === null && (
-      values.priceValue != null || values.priceDate != null ||
-      !!values.priceSupplier || !!values.priceSpec || values.priceContent != null ||
-      !!values.priceNote || !!values.priceScale
-    )
-    if (touchedPrice && (values.priceValue == null || values.priceValue <= 0)) {
-      messageApi.warning('已填写价格信息，请补上价格金额（或清空价格栏只新增物料）')
-      return
-    }
-
-    try {
-      const saved = await MaterialService.SaveMaterial(payload as Material)
-      if (!saved) {
-        messageApi.error('物料保存失败：后端未返回物料')
-        return
-      }
-      if (touchedPrice) {
-        // 物料必须先落库拿到 id，价格才能挂到它下面——
-        // 因此这里是两次调用而不是一个事务；价格存失败不影响已建好的物料。
-        const pricePayload: PricePayload = {
-          id: 0,
-          materialId: saved.id,
-          price: values.priceValue,
-          unit: values.priceUnit || '元/kg',
-          priceScale: values.priceScale || '',
-          supplier: values.priceSupplier || '',
-          // 后端 time.Time 需要完整 RFC3339（本地时区偏移），纯日期会解析失败；
-          // 没填日期时按今天算，与价格抽屉里「默认今天」的行为一致
-          date: (values.priceDate || dayjs()).format('YYYY-MM-DDTHH:mm:ssZ'),
-          spec: values.priceSpec || '',
-          content: values.priceContent || 0,
-          note: values.priceNote || '',
-        }
-        try {
-          await MaterialService.SavePrice(pricePayload as Price)
-          messageApi.success('物料与价格已新增')
-        } catch (pe) {
-          // 物料已经建好了，把这一点说清楚，否则用户会以为整次操作都失败而重复新增
-          messageApi.error(`物料已新增，但价格保存失败：${String(pe)}`)
-          setEditOpen(false)
-          load()
-          return
-        }
-      } else {
-        messageApi.success(editing ? '物料已更新' : '物料已新增')
-        if (!editing) setCurrent(1) // 新物料在第 1 页顶部，把视图带过去
-      }
-      setEditOpen(false)
-      load()
-    } catch (e) {
-      messageApi.error(String(e))
-    }
-  }
+  const openEdit = (m: MaterialWithPrice) => materialEditor.edit(m)
 
   const deleteMaterial = async (m: MaterialWithPrice) => {
     try {
@@ -251,10 +173,10 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
   }
 
   return {
-    list, loading, importing, exporting, exportOpen, clearOpen, form,
-    editOpen, editing, drawerMaterial,
-    search, refresh, openCreate, openEdit, closeEdit,
-    saveMaterial, deleteMaterial, onImport, downloadTemplate,
+    list, loading, importing, exporting, exportOpen, clearOpen,
+    drawerMaterial, materialEditor,
+    search, refresh, openEdit,
+    deleteMaterial, onImport, downloadTemplate,
     openExport, closeExport, doExport, openClear, closeClear, doClear, openPrice,
     current, pageSize, onPageChange,
   }
