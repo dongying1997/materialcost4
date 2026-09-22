@@ -28,17 +28,17 @@ export interface CalculateResult {
     "steps": (engine$0.StepResult | null)[] | null;
 
     /**
-     * 总成本（元）= 各步总成本之和
+     * （最终产物所在的）最后一步总成本（元）
      */
     "totalCost": number;
 
     /**
-     * 总产量（kg）= 最后一步主产物实际产量
+     * 最后一步主产物实际产量（kg）
      */
     "totalYieldKg": number;
 
     /**
-     * 总单位成本（元/kg）= 总成本 ÷ 总产量
+     * 最后一步单位成本（元/kg）= TotalCost ÷ TotalYieldKg
      */
     "totalUnitCost": number;
 
@@ -142,17 +142,17 @@ export interface SchemeSummary {
     "productName": string;
 
     /**
-     * UnitCost 最终产物单位成本（元/kg）= 总成本 ÷ 总产量
+     * UnitCost 最终产物单位成本（元/kg）= 最后一步总成本 ÷ 最后一步总产量
      */
     "unitCost": number;
 
     /**
-     * TotalCost 总成本（元）
+     * TotalCost 最后一步总成本（元）
      */
     "totalCost": number;
 
     /**
-     * TotalYieldKg 总产量（kg）
+     * TotalYieldKg 最后一步总产量（kg）
      */
     "totalYieldKg": number;
 
