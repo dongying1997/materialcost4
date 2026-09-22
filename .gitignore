@@ -35,3 +35,4 @@ build/android/gen/
 # Local tooling
 .claude/settings.local.json
 .task/
+.playwright-mcp/
