@@ -7,7 +7,7 @@ import { fmtNum, fmtMoney } from '@/shared/utils/format';
 import { toNumber } from '@/shared/utils/decimal';
 import DecimalInput from '@/shared/components/DecimalInput';
 import ReagentNameCell from '../ReagentNameCell';
-import ReadOnlyCell from './ReadOnlyCell';
+import ReadOnlyCell, { ReadOnlyTextCell } from './ReadOnlyCell';
 import PriceCell from './PriceCell';
 import {
   COL_RADIO,
@@ -108,11 +108,9 @@ export default function ReagentTable({
       title: 'CAS',
       width: COL_SEL,
       align: 'center',
-      render: (_, r) => (
-        <ReadOnlyCell>
-          <span style={{ fontSize: 13, color: r.cas ? '#333' : '#bbb' }}>{r.cas || '-'}</span>
-        </ReadOnlyCell>
-      ),
+      // CAS 长度不受控（库里的值来自导入的 Excel），超出列宽时省略并挂气泡。
+      // 未填时仍走同一个单元格（内容「-」占位），只是灰显，与实填值区分开。
+      render: (_, r) => <ReadOnlyTextCell text={r.cas || '-'} color={r.cas ? '#333' : '#bbb'} />,
     },
     {
       title: '分子量',
