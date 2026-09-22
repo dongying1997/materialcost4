@@ -170,7 +170,7 @@ export default function ReagentTable({
               styles={centerText}
               value='1'
               disabled
-              onChange={() => {}}
+              onChange={() => { }}
             />
           </Tooltip>
         ) : (
@@ -240,19 +240,17 @@ export default function ReagentTable({
         const isLastChain = result && result.totalCost > 0 && Math.abs(totalShareMultiplier - 1) < 1e-9;
         return (
           <div style={{ textAlign: 'right', lineHeight: 1.35 }}>
-            <Tooltip title={`成本 ${fmtMoney(c)} 元 ÷ 主产物产量`}>
-              <div style={{ color: warn ? '#faad14' : '#333', fontWeight: 500 }}>
-                {unit ? fmtMoney(unit) : '-'}
-              </div>
-            </Tooltip>
+            <div style={{ color: warn ? '#faad14' : '#333', fontWeight: 500 }}>
+              {unit ? fmtMoney(unit) : '-'}
+            </div>
             {result &&
               result.totalCost > 0 &&
               (isLastChain ? (
-                <Tooltip title='占本步成本比例'>
+                <Tooltip title='单个物料成本占比'>
                   <div style={{ fontSize: 11, color: '#999' }}>{fmtNum(stepPct, 1)}%</div>
                 </Tooltip>
               ) : (
-                <Tooltip title='本步占比 / 占总成本占比'>
+                <Tooltip title='物料在本步成本中的占比 / 物料在总成本中的占比'>
                   <div style={{ fontSize: 11, color: '#999' }}>
                     {fmtNum(stepPct, 1)}% <span style={{ color: '#ccc' }}>/</span>{' '}
                     <span style={{ color: '#333' }}>{fmtNum(totalPct, 1)}%</span>
