@@ -77,25 +77,24 @@ function SchemeImageBox({ image }: Props) {
             // 图片按上面的策略缩放；这里兜一层 overflow:hidden 是防
             // 「点击预览」等内部元素溢出框体
             overflow: 'hidden',
+            // 居中交给外层 flex，而不是让图片自己 margin:auto。
+            // .ant-image 是 inline-block、宽度由内容决定，图片比框窄时它正处在
+            // 「收缩到内容宽」的状态，此时给它 margin:auto 不生效，图片就贴了左；
+            // 而按 min(框宽, 比例宽) 写死宽度又会把宽度钉死——antd 的
+            // .ant-image-img 是 max-width:100% + object-fit:contain，宽度一旦被
+            // 钉住，contain 就不再等比缩放，图片会被拉扁。
+            // 用 flex 只负责摆位置、宽度仍交给 antd 自己算，两种情形都对。
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <Image
             src={image}
             alt="方案附图"
-            // antd 的 .ant-image 是 display:inline-block，宽度由内容决定而非满宽，
-            // 图片因此会贴左。这里给出明确的宽高 + margin:auto：
-            //   - 宽度按 min(框宽, 按比例缩放后的宽度) 算，宽度小于框宽时
-            //     （即 contain 留白的情形）margin:auto 自然把它摆到正中；
-            //   - 首帧拿不到比例时按框宽算，即贴满，不会先闪一下窄图。
-            // 注：Image 的 style 与 wrapperStyle 落在同一元素上（antd 源码里
-            // 两者都传给外层 div），所以只给 style 一份，避免重复。
-            style={{
-              display: 'block',
-              height: boxHeight,
-              width: natural === null ? '100%' : Math.min(boxWidth, boxHeight * natural),
-              margin: '0 auto',
-              objectFit: fit,
-            }}
+            // 只给高度与缩放策略，不给宽度：宽高都写死就没有自适应宽度，
+            // 会让 .ant-image 永远满宽，居中也就无从谈起。
+            style={{ display: 'block', height: boxHeight, objectFit: fit }}
             onLoad={e => {
               const el = e.currentTarget
               if (el.naturalHeight > 0) setNatural(el.naturalWidth / el.naturalHeight)
