@@ -1,5 +1,6 @@
-import { Form, Input, InputNumber, DatePicker, Space } from 'antd'
+import { Form, Input, InputNumber, DatePicker, Select, Space } from 'antd'
 import type { FormInstance } from 'antd'
+import { PRICE_SCALE_OPTIONS } from '@/shared/utils/priceScale'
 
 interface Props {
   form: FormInstance
@@ -59,6 +60,10 @@ function MaterialForm({ form, withPrice }: Props) {
             </Form.Item>
             <Form.Item name="priceUnit" label="单位">
               <Input placeholder="元/kg | 元/g | 元/mol" />
+            </Form.Item>
+            <Form.Item name="priceScale" label="数量级">
+              <Select style={{ width: '100%' }} allowClear placeholder="可选"
+                options={PRICE_SCALE_OPTIONS} />
             </Form.Item>
             <Form.Item name="priceSupplier" label="供应商">
               <Input />

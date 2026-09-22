@@ -204,6 +204,27 @@ func TestSchemeImageColumnMigration(t *testing.T) {
 	if sch.Image != "" {
 		t.Errorf("旧方案的 image 应为空串，得到 %q", sch.Image)
 	}
+
+	// prices.price_scale 是后加的列，同一轮迁移也要补上，
+	// 且升级前已存在的价格记录读出来应是空串（数量级为选填）
+	if has, err := d.hasColumn("prices", "price_scale"); err != nil || !has {
+		t.Fatalf("迁移后 prices 应存在 price_scale 列（err=%v）", err)
+	}
+	mRepo := NewMaterialRepo(d)
+	if _, err := mRepo.Insert(&models.Material{Name: "旧物料"}); err != nil {
+		t.Fatal(err)
+	}
+	oldPrice := &models.Price{MaterialID: 1, Price: 5, Unit: "元/kg", Supplier: "S"}
+	if _, err := mRepo.InsertPrice(oldPrice); err != nil {
+		t.Fatal(err)
+	}
+	got, _, err := mRepo.LatestPrice(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.PriceScale != "" {
+		t.Errorf("存量价格的 数量级 应为空串，得到 %+v", got)
+	}
 }
 
 // TestSchemeImageRoundTrip 图片随方案往返，且重复打开库不会踩 ADD COLUMN 的重复错误。

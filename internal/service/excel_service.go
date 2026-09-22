@@ -26,7 +26,7 @@ func NewExcelService(repo *db.MaterialRepo) *ExcelService {
 }
 
 // templateHeaders 模板表头（标准列名）。
-var templateHeaders = []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "供应商", "日期", "规格", "含量", "备注"}
+var templateHeaders = []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
 
 // headerAliases 表头别名容错匹配。
 var headerAliases = map[string][]string{
@@ -38,6 +38,7 @@ var headerAliases = map[string][]string{
 	"价格单位": {"价格单位", "单位", "price unit", "币种单位"},
 	"供应商":  {"供应商", "厂商", "supplier", "货商"},
 	"日期":   {"日期", "时间", "date", "报价日期", "价格日期"},
+	"数量级":  {"数量级", "规模", "采购数量级", "采购规模", "price scale", "scale", "pack size"},
 	"规格":   {"规格", "spec", "规格型号"},
 	"含量":   {"含量", "纯度", "含量%", "assay", "纯度%"},
 	"备注":   {"备注", "note", "注释", "说明"},
@@ -93,15 +94,55 @@ func (s *ExcelService) DownloadTemplate() ([]byte, error) {
 	}
 	_ = f.SetSheetRow(sheet, "A1", &headers)
 	// 示例行
-	example := []any{"甲醇", "67-56-1", "CH4O", "32.04", "3.5", "元/kg", "示例供应商", "2026-08-25", "AR", "99.5", "示例"}
+	example := []any{"甲醇", "67-56-1", "CH4O", "32.04", "3.5", "元/kg", models.PriceScaleKg, "示例供应商", "2026-08-25", "AR", "99.5", "示例"}
 	_ = f.SetSheetRow(sheet, "A2", &example)
-	// 列宽
-	_ = f.SetColWidth(sheet, "A", "K", 18)
+	_ = f.SetColWidth(sheet, "A", "M", 18)
+	// 数量级列做成下拉：这一列是枚举，手输容易写成「KG」「1吨」这类
+	// 需要归一化的写法——下拉从源头避开，同时仍允许手输（导入时会归一化）。
+	if err := addPriceScaleValidation(f, sheet); err != nil {
+		return nil, err
+	}
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// addPriceScaleValidation 在模板的「数量级」列加数据有效性下拉，
+// 覆盖到第 500 行——够普通导入用，且不必随用户增删行维护。
+// 列号由 columnOfHeader 现算，不写死：插一列就该自动跟着挪。
+func addPriceScaleValidation(f *excelize.File, sheet string) error {
+	col, err := columnOfHeader(f, sheet, "数量级")
+	if err != nil || col == "" {
+		return err
+	}
+	dv := excelize.NewDataValidation(true)
+	dv.SetSqref(col + "2:" + col + "500")
+	dv.SetError(excelize.DataValidationErrorStyleStop, "数量级取值无效",
+		"请从下拉中选择："+strings.Join(models.PriceScales[1:], "、"))
+	if err := dv.SetDropList(models.PriceScales[1:]); err != nil {
+		return err
+	}
+	return f.AddDataValidation(sheet, dv)
+}
+
+// columnOfHeader 在表头行里找标准列名所在的列字母，找不到返回空串。
+func columnOfHeader(f *excelize.File, sheet, header string) (string, error) {
+	rows, err := f.GetRows(sheet)
+	if err != nil || len(rows) == 0 {
+		return "", err
+	}
+	for i, cell := range rows[0] {
+		if matchHeader(cell) == header {
+			name, err := excelize.ColumnNumberToName(i + 1)
+			if err != nil {
+				return "", err
+			}
+			return name, nil
+		}
+	}
+	return "", nil
 }
 
 // DownloadTemplateToFile 生成导入模板，弹出保存对话框并写入文件。
@@ -156,9 +197,9 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 	for _, m := range list {
 		// 价格记录：最新模式取单条，全部模式取所有（降序）
 		type priceRow struct {
-			price, unit, supplier, spec string
-			date                        string
-			content                     float64
+			price, unit, priceScale, supplier, spec string
+			date                                    string
+			content                                 float64
 		}
 		var prices []priceRow
 		if allPrices {
@@ -168,14 +209,15 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 			}
 			for _, p := range ps {
 				prices = append(prices, priceRow{
-					price: fmt.Sprintf("%g", p.Price), unit: p.Unit, supplier: p.Supplier,
-					spec: p.Spec, date: p.Date.Format("2006-01-02"), content: p.Content,
+					price: fmt.Sprintf("%g", p.Price), unit: p.Unit, priceScale: p.PriceScale,
+					supplier: p.Supplier, spec: p.Spec,
+					date: p.Date.Format("2006-01-02"), content: p.Content,
 				})
 			}
 		} else if m.PriceCount > 0 {
 			prices = append(prices, priceRow{
-				price: fmt.Sprintf("%g", m.Price), unit: m.PriceUnit, supplier: m.Supplier,
-				date: m.PriceDate, content: m.Content,
+				price: fmt.Sprintf("%g", m.Price), unit: m.PriceUnit, priceScale: m.PriceScale,
+				supplier: m.Supplier, date: m.PriceDate, content: m.Content,
 			})
 		}
 
@@ -186,13 +228,13 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 			continue
 		}
 		for _, p := range prices {
-			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), p.price, p.unit, p.supplier, p.date, p.spec, numOrEmpty(p.content), m.Note})
+			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), p.price, p.unit, p.priceScale, p.supplier, p.date, p.spec, numOrEmpty(p.content), m.Note})
 			row++
 		}
 	}
 
 	// 列宽
-	_ = f.SetColWidth(sheet, "A", "K", 18)
+	_ = f.SetColWidth(sheet, "A", "M", 18)
 	buf, err := f.WriteToBuffer()
 	if err != nil {
 		return nil, err
@@ -296,6 +338,13 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 	}
 	if _, ok := colMap["CAS号"]; !ok {
 		return nil, fmt.Errorf("未找到 CAS 列（表头请使用「CAS」或「CAS号」等）")
+	}
+	// 表头是「备注」还是「数量级」会决定这一列按哪一种读。
+	// 两者别名里都有「说明」这类词，万一撞车要让用户知道，否则整列数据会静默读错。
+	if noteCol, ok := colMap["备注"]; ok {
+		if scaleCol, ok2 := colMap["数量级"]; ok2 && noteCol == scaleCol {
+			return nil, fmt.Errorf("表头「数量级」与「备注」指向同一列，请改用完整表头（见导入模板）")
+		}
 	}
 
 	for idx, row := range rows[1:] {
@@ -402,10 +451,19 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 		if unit == "" {
 			unit = "元/kg"
 		}
+		// 数量级认不出的写法不静默丢弃：这列是用户显式填的，闷掉等于让他以为导入成功了
+		priceScale := models.NormalizePriceScale(get("数量级"))
+		if !models.IsPriceScale(priceScale) {
+			result.Errors = append(result.Errors, fmt.Sprintf(
+				"%s：数量级「%s」无法识别，已跳过价格导入（可选值：%s）",
+				rowStr, get("数量级"), strings.Join(models.PriceScales[1:], "、")))
+			continue
+		}
 		p := &models.Price{
 			MaterialID: material.ID,
 			Price:      priceVal,
 			Unit:       unit,
+			PriceScale: priceScale,
 			Supplier:   get("供应商"),
 			Spec:       get("规格"),
 			Content:    parseFloat(get("含量")),

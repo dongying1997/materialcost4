@@ -37,14 +37,13 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice, current, pag
     { title: '化学式', dataIndex: 'formula', width: 100, render: v => v || '-' },
     { title: '分子量', dataIndex: 'molWeight', width: 100, render: v => v || '-' },
     {
-      title: '当前价格', width: 100,
+      title: '参考价格', width: 100,
       render: (_, r) => r.priceCount ? (
         <Tooltip title={
           <div style={{ maxWidth: 240, lineHeight: 1.6 }}>
-            <div>供应商：{r.supplier || '-'}</div>
-            <div>日期：{r.priceDate || '-'}</div>
-            <div>备注：{r.note || '-'}</div>
-
+            <div>{r.supplier || ''}</div>
+            <div>{r.priceDate || ''}</div>
+            <div>{r.priceNote || ''}</div>
           </div>
         }>
           <span>{fmtMoney(r.price)} <span style={{ color: '#999', fontSize: 12 }}>{r.priceUnit}</span></span>

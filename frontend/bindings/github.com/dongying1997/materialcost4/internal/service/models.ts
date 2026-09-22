@@ -86,6 +86,11 @@ export interface MaterialPriceOption {
     "materialId": number;
     "price": number;
     "unit": string;
+
+    /**
+     * 数量级
+     */
+    "priceScale": string;
     "pricePerKg": number;
     "supplier": string;
     "date": string;

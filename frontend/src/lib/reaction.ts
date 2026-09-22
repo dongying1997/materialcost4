@@ -9,7 +9,8 @@ export const PRICE_DRIFT_THRESHOLD = 0.01
 
 /** 空快照（未设置价格） */
 export const emptyPrice = (): PriceSnapshot => ({
-  unitPriceYuanPerKg: 0, price: 0, unit: '元/kg', supplier: '', date: '', spec: '',
+  unitPriceYuanPerKg: 0, price: 0, unit: '元/kg', priceScale: '',
+  supplier: '', date: '', spec: '',
 })
 
 /** 由物料库的历史价格选项构造价格快照（下拉选择时用） */
@@ -18,6 +19,7 @@ export function priceFromOption(o: MaterialPriceOption): PriceSnapshot {
     unitPriceYuanPerKg: o.pricePerKg,
     price: o.price,
     unit: o.unit,
+    priceScale: o.priceScale || '',
     supplier: o.supplier,
     date: o.date,
     spec: o.spec,

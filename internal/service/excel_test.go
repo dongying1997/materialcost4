@@ -19,24 +19,24 @@ func TestExcelImport(t *testing.T) {
 	// 构建测试 xlsx：两行
 	f := excelize.NewFile()
 	sheet := "Sheet1"
-	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "供应商", "日期", "规格", "含量", "备注"}
+	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
 	}
-	row2 := []any{"苯", "71-43-2", "C6H6", "78.11", "8.5", "元/kg", "S公司", "2026-08-25", "AR", "99.8", "测试"}
+	row2 := []any{"苯", "71-43-2", "C6H6", "78.11", "8.5", "元/kg", "吨", "S公司", "2026-08-25", "AR", "99.8", "测试"}
 	for i, v := range row2 {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 2)
 		f.SetCellValue(sheet, cell, v)
 	}
 	// 第三行：Excel 序列号日期（45198 ≈ 2026-08-25）? 用 46000 测试序列号
-	row3 := []any{"乙醇", "64-17-5", "C2H6O", "46.07", "4.2", "元/kg", "S公司", float64(46000), "AR", "99", ""}
+	row3 := []any{"乙醇", "64-17-5", "C2H6O", "46.07", "4.2", "元/kg", "千克", "S公司", float64(46000), "AR", "99", ""}
 	for i, v := range row3 {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 3)
 		f.SetCellValue(sheet, cell, v)
 	}
 	// 第四行：真实日期单元格（2026-08-25，会按 m/d/yy 格式渲染成 08-25-26）
-	row4 := []any{"丙酮", "67-64-1", "C3H6O", "58.08", "6.8", "元/kg", "S公司", time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local), "AR", "99.5", ""}
+	row4 := []any{"丙酮", "67-64-1", "C3H6O", "58.08", "6.8", "元/kg", "", "S公司", time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local), "AR", "99.5", ""}
 	for i, v := range row4 {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 4)
 		f.SetCellValue(sheet, cell, v)
@@ -86,6 +86,18 @@ func TestExcelImport(t *testing.T) {
 	}
 	if prices[0].Supplier != "S公司" {
 		t.Errorf("supplier = %v", prices[0].Supplier)
+	}
+	if prices[0].PriceScale != models.PriceScaleTon {
+		t.Errorf("苯 数量级 = %q, want %q", prices[0].PriceScale, models.PriceScaleTon)
+	}
+	eth, _ := repo.GetByCAS("64-17-5")
+	if eps, _ := repo.ListPrices(eth.ID, ""); len(eps) != 1 || eps[0].PriceScale != models.PriceScaleKg {
+		t.Errorf("乙醇 数量级 = %+v, want %q", eps, models.PriceScaleKg)
+	}
+	// 数量级是可选的：丙酮那格留空，应导入成空串而不是报错
+	ac, _ := repo.GetByCAS("67-64-1")
+	if aps, _ := repo.ListPrices(ac.ID, ""); len(aps) != 1 || aps[0].PriceScale != "" {
+		t.Errorf("丙酮 数量级应为空串，得到 %+v", aps)
 	}
 
 	// 序列号日期验证
@@ -142,12 +154,12 @@ func TestImportMatchesByCASWithAlias(t *testing.T) {
 
 	f := excelize.NewFile()
 	sheet := f.GetSheetName(0)
-	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "供应商", "日期", "规格", "含量", "备注"}
+	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
 	}
-	row2 := []any{"1,4-苯醌", "106-51-4", "C6H4O2", "108.09", "20", "元/kg", "S公司", "2026-08-25", "AR", "99", ""}
+	row2 := []any{"1,4-苯醌", "106-51-4", "C6H4O2", "108.09", "20", "元/kg", "", "S公司", "2026-08-25", "AR", "99", ""}
 	for i, v := range row2 {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 2)
 		f.SetCellValue(sheet, cell, v)
@@ -223,7 +235,7 @@ func TestImportPrefersCASMatchOverNameMatch(t *testing.T) {
 
 	f := excelize.NewFile()
 	sheet := f.GetSheetName(0)
-	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "供应商", "日期", "规格", "含量", "备注"}
+	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
@@ -319,7 +331,7 @@ func TestExportMaterials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 8.5, Unit: "元/kg", Supplier: "S公司", Date: time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local)}); err != nil {
+	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 8.5, Unit: "元/kg", PriceScale: models.PriceScaleTon, Supplier: "S公司", Date: time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local)}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := repo.InsertPrice(&models.Price{MaterialID: id1, Price: 9.0, Unit: "元/kg", Supplier: "T公司", Date: time.Date(2026, 8, 20, 0, 0, 0, 0, time.Local)}); err != nil {
@@ -354,9 +366,16 @@ func TestExportMaterials(t *testing.T) {
 	if rows[1][1] != "64-17-5" || (len(rows[1]) > 4 && rows[1][4] != "") {
 		t.Errorf("乙醇 row = %v", rows[1])
 	}
+	// 乙醇没有价格，「数量级」列也应为空
+	if len(rows[1]) > 6 && rows[1][6] != "" {
+		t.Errorf("乙醇 数量级列应留空，得到 %q", rows[1][6])
+	}
 	// 苯（最新价 8.5，2026-08-25 最新）
-	if rows[2][4] != "8.5" || rows[2][7] != "2026-08-25" || rows[2][6] != "S公司" {
+	if rows[2][4] != "8.5" || rows[2][8] != "2026-08-25" || rows[2][7] != "S公司" {
 		t.Errorf("苯 latest row = %v", rows[2])
+	}
+	if rows[2][6] != models.PriceScaleTon {
+		t.Errorf("苯 数量级列 = %q, want %q", rows[2][6], models.PriceScaleTon)
 	}
 
 	// ---- 全部价格模式 ----
@@ -384,4 +403,133 @@ func TestExportMaterials(t *testing.T) {
 
 func bytesReader(b []byte) *strings.Reader {
 	return strings.NewReader(string(b))
+}
+
+// TestTemplatePriceScaleDropdown 模板的数量级列带数据有效性下拉，
+// 且下拉项与 models.PriceScales 一致（否则模板里选的值得不到导入端的认可）。
+func TestTemplatePriceScaleDropdown(t *testing.T) {
+	d := newTestDB(t)
+	svc := NewExcelService(db.NewMaterialRepo(d))
+	data, err := svc.DownloadTemplate()
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+	f, err := excelize.OpenReader(bytesReader(data))
+	if err != nil {
+		t.Fatalf("open template: %v", err)
+	}
+	dvs, err := f.GetDataValidations("Sheet1")
+	if err != nil {
+		t.Fatalf("data validations: %v", err)
+	}
+	if len(dvs) != 1 {
+		t.Fatalf("模板应有 1 条数据有效性，得到 %d", len(dvs))
+	}
+	dv := dvs[0]
+	if dv.Type != "list" {
+		t.Errorf("有效性类型 = %q, want list", dv.Type)
+	}
+	// 下拉要落在数量级那一列（G），从表头行往下
+	if !strings.HasPrefix(dv.Sqref, "G2:") {
+		t.Errorf("有效性范围 = %q, want 以 G2: 开头", dv.Sqref)
+	}
+	for _, v := range models.PriceScales[1:] {
+		if !strings.Contains(dv.Formula1, v) {
+			t.Errorf("下拉项缺少 %q（got %s）", v, dv.Formula1)
+		}
+	}
+}
+
+// TestPriceScaleExportImportRoundTrip 数量级要能原样走完 导出 → 导入 一圈，
+// 否则「导出的文件可回导」这个约束就断了。
+func TestPriceScaleExportImportRoundTrip(t *testing.T) {
+	d := newTestDB(t)
+	repo := db.NewMaterialRepo(d)
+	svc := NewExcelService(repo)
+
+	id, err := repo.Insert(&models.Material{Name: "苯", CAS: "71-43-2", Formula: "C6H6", MolWeight: 78.11})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.InsertPrice(&models.Price{
+		MaterialID: id, Price: 8.5, Unit: "元/kg", PriceScale: models.PriceScaleTon,
+		Supplier: "S公司", Date: time.Date(2026, 8, 25, 0, 0, 0, 0, time.Local),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := svc.ExportMaterials(true)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+
+	// 导入到一个空库，数量级应原样落地
+	d2 := newTestDB(t)
+	svc2 := NewExcelService(db.NewMaterialRepo(d2))
+	res, err := svc2.ImportFromBytes(data, "roundtrip.xlsx")
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("round trip errors = %v", res.Errors)
+	}
+	if res.PricesImported != 1 {
+		t.Fatalf("prices imported = %d, want 1", res.PricesImported)
+	}
+	got, _ := db.NewMaterialRepo(d2).GetByCAS("71-43-2")
+	ps, err := db.NewMaterialRepo(d2).ListPrices(got.ID, "")
+	if err != nil || len(ps) != 1 {
+		t.Fatalf("round trip prices: %v %d", err, len(ps))
+	}
+	if ps[0].PriceScale != models.PriceScaleTon {
+		t.Errorf("数量级 往返后 = %q, want %q", ps[0].PriceScale, models.PriceScaleTon)
+	}
+}
+
+// TestImportRejectsUnknownPriceScale 认不出的数量级要报错并跳过该条价格，
+// 而不是静默丢弃——用户显式填的内容被闷掉比报错更难排查。
+func TestImportRejectsUnknownPriceScale(t *testing.T) {
+	d := newTestDB(t)
+	repo := db.NewMaterialRepo(d)
+	svc := NewExcelService(repo)
+
+	f := excelize.NewFile()
+	sheet := f.GetSheetName(0)
+	headers := []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
+	for i, h := range headers {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheet, cell, h)
+	}
+	// 第二行用等价写法（应被归一化），第三行用认不出的写法（应报错跳过价格）
+	row2 := []any{"苯", "71-43-2", "", "", "8.5", "元/kg", "1吨", "S公司", "2026-08-25", "", "", ""}
+	row3 := []any{"乙醇", "64-17-5", "", "", "4.2", "元/kg", "一箱", "S公司", "2026-08-25", "", "", ""}
+	for i, v := range row2 {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 2)
+		f.SetCellValue(sheet, cell, v)
+	}
+	for i, v := range row3 {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 3)
+		f.SetCellValue(sheet, cell, v)
+	}
+	buf, _ := f.WriteToBuffer()
+
+	res, err := svc.ImportFromBytes(buf.Bytes(), "scale.xlsx")
+	if err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if res.PricesImported != 1 {
+		t.Errorf("prices imported = %d, want 1（第二行合法、第三行应被拒）", res.PricesImported)
+	}
+	if len(res.Errors) != 1 || !strings.Contains(res.Errors[0], "一箱") {
+		t.Errorf("errors = %v, want 一条提到「一箱」", res.Errors)
+	}
+	benzene, _ := repo.GetByCAS("71-43-2")
+	ps, _ := repo.ListPrices(benzene.ID, "")
+	if len(ps) != 1 || ps[0].PriceScale != models.PriceScaleTon {
+		t.Errorf("「1吨」应归一化为 %q，得到 %+v", models.PriceScaleTon, ps)
+	}
+	// 物料本身仍应导入，只是价格被跳过
+	if ethanol, _ := repo.GetByCAS("64-17-5"); ethanol == nil {
+		t.Error("数量级非法只应跳过价格，物料本身要照常导入")
+	}
 }

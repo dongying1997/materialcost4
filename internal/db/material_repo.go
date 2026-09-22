@@ -172,6 +172,8 @@ func (r *MaterialRepo) ListWithPrice(keyword string) ([]*models.MaterialWithPric
 		if price != nil {
 			wp.Price = price.Price
 			wp.PriceUnit = price.Unit
+			wp.PriceScale = price.PriceScale
+			wp.PriceNote = price.Note
 			wp.Supplier = price.Supplier
 			wp.PriceDate = price.Date.Format("2006-01-02")
 		}
@@ -186,9 +188,9 @@ func (r *MaterialRepo) InsertPrice(p *models.Price) (int64, error) {
 		p.CreatedAt = time.Now()
 	}
 	res, err := r.db.Exec(`INSERT INTO prices
-		(material_id,price,unit,supplier,date,spec,content,note,created_at)
-		VALUES (?,?,?,?,?,?,?,?,?)`,
-		p.MaterialID, p.Price, p.Unit, p.Supplier, p.Date.Format("2006-01-02"), p.Spec, p.Content, p.Note, p.CreatedAt.Format("2006-01-02 15:04:05"))
+		(material_id,price,unit,price_scale,supplier,date,spec,content,note,created_at)
+		VALUES (?,?,?,?,?,?,?,?,?,?)`,
+		p.MaterialID, p.Price, p.Unit, p.PriceScale, p.Supplier, p.Date.Format("2006-01-02"), p.Spec, p.Content, p.Note, p.CreatedAt.Format("2006-01-02 15:04:05"))
 	if err != nil {
 		return 0, err
 	}
@@ -198,9 +200,9 @@ func (r *MaterialRepo) InsertPrice(p *models.Price) (int64, error) {
 // UpdatePrice 更新价格记录。
 func (r *MaterialRepo) UpdatePrice(p *models.Price) error {
 	_, err := r.db.Exec(`UPDATE prices SET
-		price=?, unit=?, supplier=?, date=?, spec=?, content=?, note=?
+		price=?, unit=?, price_scale=?, supplier=?, date=?, spec=?, content=?, note=?
 		WHERE id=?`,
-		p.Price, p.Unit, p.Supplier, p.Date.Format("2006-01-02"), p.Spec, p.Content, p.Note, p.ID)
+		p.Price, p.Unit, p.PriceScale, p.Supplier, p.Date.Format("2006-01-02"), p.Spec, p.Content, p.Note, p.ID)
 	return err
 }
 
@@ -212,7 +214,7 @@ func (r *MaterialRepo) DeletePrice(id int64) error {
 
 // ListPrices 按条件查询价格：供应商/化合物名称/CAS/物料备注（含别名）。
 func (r *MaterialRepo) ListPrices(materialID int64, keyword string) ([]*models.Price, error) {
-	q := `SELECT p.id,p.material_id,p.price,p.unit,p.supplier,p.date,p.spec,p.content,p.note,p.created_at
+	q := `SELECT p.id,p.material_id,p.price,p.unit,p.price_scale,p.supplier,p.date,p.spec,p.content,p.note,p.created_at
 		FROM prices p JOIN materials m ON m.id = p.material_id WHERE 1=1`
 	var args []any
 	if materialID > 0 {
@@ -234,7 +236,7 @@ func (r *MaterialRepo) ListPrices(materialID int64, keyword string) ([]*models.P
 	for rows.Next() {
 		p := &models.Price{}
 		var date, created string
-		if err := rows.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
+		if err := rows.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.PriceScale, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
 			return nil, err
 		}
 		p.Date, _ = parseDate(date)
@@ -250,11 +252,11 @@ func (r *MaterialRepo) LatestPrice(materialID int64) (*models.Price, int, error)
 	if err := r.db.QueryRow(`SELECT COUNT(*) FROM prices WHERE material_id=?`, materialID).Scan(&count); err != nil {
 		return nil, 0, err
 	}
-	row := r.db.QueryRow(`SELECT id,material_id,price,unit,supplier,date,spec,content,note,created_at
+	row := r.db.QueryRow(`SELECT id,material_id,price,unit,price_scale,supplier,date,spec,content,note,created_at
 		FROM prices WHERE material_id=? ORDER BY date DESC, id DESC LIMIT 1`, materialID)
 	p := &models.Price{}
 	var date, created string
-	if err := row.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
+	if err := row.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.PriceScale, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, count, nil
 		}
@@ -267,11 +269,11 @@ func (r *MaterialRepo) LatestPrice(materialID int64) (*models.Price, int, error)
 
 // FindPrice 按 id 取单条价格记录。
 func (r *MaterialRepo) FindPrice(id int64) (*models.Price, error) {
-	row := r.db.QueryRow(`SELECT id,material_id,price,unit,supplier,date,spec,content,note,created_at
+	row := r.db.QueryRow(`SELECT id,material_id,price,unit,price_scale,supplier,date,spec,content,note,created_at
 		FROM prices WHERE id=?`, id)
 	p := &models.Price{}
 	var date, created string
-	if err := row.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
+	if err := row.Scan(&p.ID, &p.MaterialID, &p.Price, &p.Unit, &p.PriceScale, &p.Supplier, &date, &p.Spec, &p.Content, &p.Note, &created); err != nil {
 		return nil, err
 	}
 	p.Date, _ = parseDate(date)

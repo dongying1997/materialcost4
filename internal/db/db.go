@@ -68,6 +68,7 @@ func (d *DB) migrate() error {
 			material_id INTEGER NOT NULL REFERENCES materials(id) ON DELETE CASCADE,
 			price REAL NOT NULL DEFAULT 0,
 			unit TEXT NOT NULL DEFAULT '元/kg',
+			price_scale TEXT NOT NULL DEFAULT '',
 			supplier TEXT NOT NULL DEFAULT '',
 			date TEXT NOT NULL,
 			spec TEXT NOT NULL DEFAULT '',
@@ -91,21 +92,38 @@ func (d *DB) migrate() error {
 			return err
 		}
 	}
-	return d.addSchemeImageColumn()
+	return d.addMissingColumns()
 }
 
-// addSchemeImageColumn 给升级前建的 schemes 表补上 image 列。
+// addedColumns 升级前建的库需要补的列（表名 → 列名 → 列定义）。
+//
+// 新库由上面 migrate 的 CREATE TABLE 直接带上这些列，这里会全部走「已存在」分支。
+// 加新列时只改这张表，不必再写一个 addXxxColumn。
+var addedColumns = []struct {
+	table, column, def string
+}{
+	{"schemes", "image", `ALTER TABLE schemes ADD COLUMN image TEXT NOT NULL DEFAULT ''`},
+	{"prices", "price_scale", `ALTER TABLE prices ADD COLUMN price_scale TEXT NOT NULL DEFAULT ''`},
+}
+
+// addMissingColumns 给升级前建的库补上 addedColumns 里缺的列。
 //
 // SQLite 不支持 ADD COLUMN IF NOT EXISTS，重复执行会报 duplicate column name，
-// 所以先查表结构确认列不存在再改。新库由上面的 CREATE TABLE 直接带上该列，
-// 这里会走「已存在」分支直接返回。
-func (d *DB) addSchemeImageColumn() error {
-	has, err := d.hasColumn("schemes", "image")
-	if err != nil || has {
-		return err
+// 所以先查表结构确认列不存在再改。
+func (d *DB) addMissingColumns() error {
+	for _, c := range addedColumns {
+		has, err := d.hasColumn(c.table, c.column)
+		if err != nil {
+			return err
+		}
+		if has {
+			continue
+		}
+		if _, err := d.Exec(c.def); err != nil {
+			return err
+		}
 	}
-	_, err = d.Exec(`ALTER TABLE schemes ADD COLUMN image TEXT NOT NULL DEFAULT ''`)
-	return err
+	return nil
 }
 
 // hasColumn 判断表上是否已有某列。

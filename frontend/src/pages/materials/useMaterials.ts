@@ -119,7 +119,7 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
     const touchedPrice = editing === null && (
       values.priceValue != null || values.priceDate != null ||
       !!values.priceSupplier || !!values.priceSpec || values.priceContent != null ||
-      !!values.priceNote
+      !!values.priceNote || !!values.priceScale
     )
     if (touchedPrice && (values.priceValue == null || values.priceValue <= 0)) {
       messageApi.warning('已填写价格信息，请补上价格金额（或清空价格栏只新增物料）')
@@ -140,6 +140,7 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
           materialId: saved.id,
           price: values.priceValue,
           unit: values.priceUnit || '元/kg',
+          priceScale: values.priceScale || '',
           supplier: values.priceSupplier || '',
           // 后端 time.Time 需要完整 RFC3339（本地时区偏移），纯日期会解析失败；
           // 没填日期时按今天算，与价格抽屉里「默认今天」的行为一致

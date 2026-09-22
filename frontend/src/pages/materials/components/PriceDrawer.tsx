@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Popconfirm, message } from 'antd'
+import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Select, Popconfirm, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { MaterialService } from '@/lib/bindings'
 import type { Price, PricePayload, MaterialWithPrice } from '@/types'
 import { fmtMoney } from '@/shared/utils/format'
+import { PRICE_SCALE_OPTIONS } from '@/shared/utils/priceScale'
 
 interface Props {
   material: MaterialWithPrice | null
@@ -49,7 +50,8 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
   const openEdit = (p: Price) => {
     setEditing(p)
     form.setFieldsValue({
-      price: p.price, unit: p.unit, supplier: p.supplier,
+      price: p.price, unit: p.unit, priceScale: p.priceScale || undefined,
+      supplier: p.supplier,
       date: dayjs(p.date), spec: p.spec, content: p.content, note: p.note,
     })
     setEditOpen(true)
@@ -62,6 +64,7 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
       id: editing?.id || 0,
       materialId: material.id,
       price: v.price, unit: v.unit || '元/kg',
+      priceScale: v.priceScale || '',
       supplier: v.supplier || '',
       // 后端 time.Time 需要完整 RFC3339（本地时区偏移），纯日期会解析失败
       date: v.date ? v.date.format('YYYY-MM-DDTHH:mm:ssZ') : '',
@@ -96,7 +99,7 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
         title={material ? `价格历史 — ${material.name}（${material.cas || '无 CAS'}）` : '价格历史'}
         open={open}
         onClose={onClose}
-        width={680}
+        width={780}
       >
         <div style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增价格</Button>
@@ -110,6 +113,7 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
           columns={[
             { title: '价格', dataIndex: 'price', width: 50, align: 'center', render: v => fmtMoney(v) },
             { title: '单位', dataIndex: 'unit', width: 80, align: 'center' },
+            { title: '数量级', dataIndex: 'priceScale', width: 76, align: 'center', render: v => v || '-' },
             { title: '供应商', dataIndex: 'supplier', width: 120, align: 'center', render: v => v || '-' },
             { title: '日期', dataIndex: 'date', width: 120 , align: 'center',render: v => dayjs(v).format('YYYY-MM-DD') },
             { title: '规格', dataIndex: 'spec', width: 100, render: v => v || '-' },
@@ -144,6 +148,10 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
             </Form.Item>
             <Form.Item name="unit" label="单位">
               <Input placeholder="元/kg | 元/g | 元/mol" />
+            </Form.Item>
+            <Form.Item name="priceScale" label="数量级">
+              <Select style={{ width: '100%' }} allowClear placeholder="可选"
+                options={PRICE_SCALE_OPTIONS} />
             </Form.Item>
             <Form.Item name="supplier" label="供应商">
               <Input />

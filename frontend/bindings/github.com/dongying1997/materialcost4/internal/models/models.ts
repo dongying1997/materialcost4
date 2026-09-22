@@ -75,6 +75,16 @@ export interface MaterialWithPrice {
     "updatedAt": string;
     "price": number;
     "priceUnit": string;
+
+    /**
+     * 最新一条价格的数量级
+     */
+    "priceScale": string;
+
+    /**
+     * 最新一条价格的备注
+     */
+    "priceNote": string;
     "supplier": string;
     "priceDate": string;
     "priceCount": number;
@@ -96,6 +106,11 @@ export interface Price {
      * 元/g | 元/mol | 元/kg
      */
     "unit": string;
+
+    /**
+     * 数量级：千克 | 十千克 | 百千克 | 吨（空 = 未填）
+     */
+    "priceScale": string;
 
     /**
      * 供应商
@@ -139,6 +154,11 @@ export interface PriceSnapshot {
      * 原始报价单位：元/kg | 元/g | 元/mol
      */
     "unit": string;
+
+    /**
+     * 数量级：千克 | 十千克 | 百千克 | 吨（空 = 未填）
+     */
+    "priceScale": string;
 
     /**
      * 供应商

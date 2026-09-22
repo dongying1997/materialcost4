@@ -50,6 +50,7 @@ type MaterialPriceOption struct {
 	MaterialID int64   `json:"materialId"`
 	Price      float64 `json:"price"`
 	Unit       string  `json:"unit"`
+	PriceScale string  `json:"priceScale"` // 数量级
 	PricePerKg float64 `json:"pricePerKg"`
 	Supplier   string  `json:"supplier"`
 	Date       string  `json:"date"`
@@ -84,6 +85,7 @@ func (s *ReactionService) PriceOptionsForMaterial(materialID int64) ([]MaterialP
 			MaterialID: p.MaterialID,
 			Price:      p.Price,
 			Unit:       p.Unit,
+			PriceScale: p.PriceScale,
 			PricePerKg: perKg,
 			Supplier:   p.Supplier,
 			Date:       p.Date.Format("2006-01-02"),

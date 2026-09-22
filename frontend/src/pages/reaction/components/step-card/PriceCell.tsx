@@ -20,7 +20,10 @@ const CONVERT_UNITS = new Set(['元/g', '元/mol']);
 function priceOptionLabel(o: MaterialPriceOption): string {
   const raw = `${fmtMoney(o.price)}${o.unit || ''}`;
   const price = CONVERT_UNITS.has((o.unit || '').trim()) ? `${raw} → ${fmtMoney(o.pricePerKg)} 元/kg` : raw;
-  return `${o.date} ${price}${o.supplier ? ' · ' + o.supplier : ''}`;
+  // 数量级紧跟单位：它是这条报价的一部分（「元/kg · 吨」读起来就是「按吨采购的每公斤价」），
+  // 和供应商一样属于来源信息，不放在末尾是为了避免和「 · 供应商」的层级混淆
+  const scale = o.priceScale ? ` · ${o.priceScale}` : '';
+  return `${o.date} ${price}${scale}${o.supplier ? ' · ' + o.supplier : ''}`;
 }
 
 export default function PriceCell({ row, onChange }: { row: ReagentRow; onChange: (p: PriceSnapshot | null) => void }) {
@@ -36,7 +39,7 @@ export default function PriceCell({ row, onChange }: { row: ReagentRow; onChange
   // 价格来源说明：有供应商/日期就显示，便于确认这个数字是从哪来的
   const sourceMsg =
     row.price?.date || row.price?.supplier
-      ? `当前单价来自：${row.price?.date || '-'}${row.price?.supplier ? ' · ' + row.price.supplier : ''}${row.price?.spec ? ' · ' + row.price.spec : ''}`
+      ? `当前单价来自：${row.price?.date || '-'}${row.price?.priceScale ? ' · ' + row.price.priceScale : ''}${row.price?.supplier ? ' · ' + row.price.supplier : ''}${row.price?.spec ? ' · ' + row.price.spec : ''}`
       : '手动输入单价';
 
   const historyMenu = {
@@ -75,7 +78,7 @@ export default function PriceCell({ row, onChange }: { row: ReagentRow; onChange
           }
           const n = toNumber(v);
           // 手动输入的单价是自定义报价，不再是物料库里的那条报价记录——
-          // 必须丢掉 supplier/date/spec，否则界面会把库里的登记时间当成
+          // 必须丢掉 supplier/date/spec/priceScale，否则界面会把库里的登记时间当成
           // 这条手填价格的来源显示出来（曾因此误报过）。
           onChange({ ...emptyPrice(), unitPriceYuanPerKg: n, price: n, unit: '元/kg' });
         }}
