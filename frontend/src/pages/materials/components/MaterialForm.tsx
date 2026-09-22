@@ -73,6 +73,9 @@ function MaterialForm({ form, withPrice }: Props) {
               <InputNumber style={{ width: '100%' }} min={0} max={100} />
             </Form.Item>
           </div>
+          <Form.Item name="priceNote" label="备注">
+            <Input.TextArea rows={2} />
+          </Form.Item>
         </>
       )}
     </Form>

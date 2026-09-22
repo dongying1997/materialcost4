@@ -118,7 +118,8 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
     // 同名会互相覆盖。
     const touchedPrice = editing === null && (
       values.priceValue != null || values.priceDate != null ||
-      !!values.priceSupplier || !!values.priceSpec || values.priceContent != null
+      !!values.priceSupplier || !!values.priceSpec || values.priceContent != null ||
+      !!values.priceNote
     )
     if (touchedPrice && (values.priceValue == null || values.priceValue <= 0)) {
       messageApi.warning('已填写价格信息，请补上价格金额（或清空价格栏只新增物料）')
@@ -145,7 +146,7 @@ export function useMaterials(messageApi: MessageInstance): MaterialsApi {
           date: (values.priceDate || dayjs()).format('YYYY-MM-DDTHH:mm:ssZ'),
           spec: values.priceSpec || '',
           content: values.priceContent || 0,
-          note: '',
+          note: values.priceNote || '',
         }
         try {
           await MaterialService.SavePrice(pricePayload as Price)
