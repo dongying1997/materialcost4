@@ -40,10 +40,13 @@ function MaterialForm({ form, withPrice }: Props) {
         <Form.Item name="recoveryRate" label="回收率(%)">
           <InputNumber style={{ width: '100%' }} min={0} max={100} placeholder="默认 0" />
         </Form.Item>
+        {/* 备注与其余字段同栏同排：原先它自己占一整行，使本段停在一个只有
+            一半的奇数行上。单行输入而非多行文本域是它的代价——表格里的
+            备注列也就是一行的宽度。 */}
+        <Form.Item name="note" label="物料备注">
+          <Input placeholder="例如 别名、纯度说明" />
+        </Form.Item>
       </div>
-      <Form.Item name="note" label="备注">
-        <Input.TextArea rows={2} />
-      </Form.Item>
 
       {withPrice && (
         <>
@@ -77,10 +80,10 @@ function MaterialForm({ form, withPrice }: Props) {
             <Form.Item name="priceContent" label="含量(%)">
               <InputNumber style={{ width: '100%' }} min={0} max={100} />
             </Form.Item>
+            <Form.Item name="priceNote" label="价格备注">
+              <Input placeholder="例如 含税、按吨报价" />
+            </Form.Item>
           </div>
-          <Form.Item name="priceNote" label="备注">
-            <Input.TextArea rows={2} />
-          </Form.Item>
         </>
       )}
     </Form>
