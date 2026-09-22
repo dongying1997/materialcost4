@@ -1,4 +1,4 @@
-import { Modal } from 'antd'
+import { ConfigProvider, Modal } from 'antd'
 import type { FormInstance } from 'antd'
 import type { Material } from '@/types'
 import MaterialForm from '@/pages/materials/components/MaterialForm'
@@ -14,6 +14,10 @@ interface Props {
 /** 新增 / 编辑物料弹窗 */
 function MaterialEditModal({ open, editing, form, onOk, onCancel }: Props) {
   return (
+    // 这一层 ConfigProvider 只作用于本弹窗里的表单：把 antd 默认的 24px
+    // 字段间距收紧到 12px（行）与 8px（错误文案到下一行），一屏能多放两行
+    // 字段。做成局部而非全局，是因为密集表单才需要，列表页的表不受影响。
+    <ConfigProvider theme={{ components: { Form: { itemMarginBottom: 12, verticalLabelPadding: '0 0 4px' } } }}>
     <Modal
       title={editing ? '编辑物料' : '新增物料'}
       open={open}
@@ -22,12 +26,13 @@ function MaterialEditModal({ open, editing, form, onOk, onCancel }: Props) {
       width={560}
       // 新增时表单多出「初始价格」一段，在小屏幕上会顶到窗口边缘；
       // 给内容区滚动而不是让弹窗继续长高
-      styles={{ body: { maxHeight: '64vh', overflowY: 'auto', paddingInlineEnd: 8 } }}
+      styles={{ body: { maxHeight: '76vh', overflowY: 'auto', paddingInlineEnd: 8 } }}
       destroyOnClose
     >
       {/* 价格表单只在新增时出现：编辑已有物料的价格走「价格」抽屉的历史列表 */}
       <MaterialForm form={form} withPrice={!editing} />
     </Modal>
+    </ConfigProvider>
   )
 }
 

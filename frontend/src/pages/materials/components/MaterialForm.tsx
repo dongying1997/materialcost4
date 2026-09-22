@@ -1,4 +1,4 @@
-import { Form, Input, InputNumber, DatePicker, Select, Space } from 'antd'
+import { Form, Input, InputNumber, DatePicker, Select } from 'antd'
 import type { FormInstance } from 'antd'
 import { PRICE_SCALE_OPTIONS } from '@/shared/utils/priceScale'
 
@@ -52,11 +52,8 @@ function MaterialForm({ form, withPrice }: Props) {
         <>
           {/* 用分隔线把「物料」与「价格」两段分开：价格整段都可留空，
               不划线的话用户会以为下面几个也是必填 */}
-          <div style={{ borderTop: '1px solid #f0f0f0', margin: '4px 0 16px' }} />
-          <Space style={{ marginBottom: 8 }} size={8}>
-            <span style={{ fontWeight: 500 }}>初始价格</span>
-            <span style={{ color: '#999', fontSize: 12 }}>可选，留空则只新增物料</span>
-          </Space>
+          <div style={{ borderTop: '1px solid #f0f0f0', margin: '0 0 12px' }} />
+        
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="priceValue" label="价格">
               <InputNumber style={{ width: '100%' }} min={0} step={0.01} placeholder="例如 1200" />

@@ -1,4 +1,4 @@
-import { Modal, Form, Input } from 'antd'
+import { ConfigProvider, Modal, Form, Input } from 'antd'
 import type { FormInstance } from 'antd'
 
 interface Props {
@@ -17,6 +17,8 @@ interface Props {
  */
 function SchemeRenameModal({ open, form, saving, onOk, onCancel }: Props) {
   return (
+    // 与物料/价格弹窗同一套收紧后的表单间距
+    <ConfigProvider theme={{ components: { Form: { itemMarginBottom: 12, verticalLabelPadding: '0 0 4px' } } }}>
     <Modal
       title="重命名方案"
       open={open}
@@ -32,6 +34,7 @@ function SchemeRenameModal({ open, form, saving, onOk, onCancel }: Props) {
         </Form.Item>
       </Form>
     </Modal>
+    </ConfigProvider>
   )
 }
 

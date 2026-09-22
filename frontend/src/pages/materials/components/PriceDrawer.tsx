@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Select, Tooltip, Popconfirm, message } from 'antd'
+import { ConfigProvider, Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Select, Tooltip, Popconfirm, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { MaterialService } from '@/lib/bindings'
@@ -137,6 +137,8 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
         />
       </Drawer>
 
+      {/* 与物料弹窗同一套收紧后的表单间距（见 MaterialEditModal） */}
+      <ConfigProvider theme={{ components: { Form: { itemMarginBottom: 12, verticalLabelPadding: '0 0 4px' } } }}>
       <Modal
         title={editing ? '编辑价格' : '新增价格'}
         open={editOpen}
@@ -175,6 +177,7 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
           </Form.Item>
         </Form>
       </Modal>
+      </ConfigProvider>
     </>
   )
 }
