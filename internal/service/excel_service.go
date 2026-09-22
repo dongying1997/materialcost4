@@ -26,7 +26,7 @@ func NewExcelService(repo *db.MaterialRepo) *ExcelService {
 }
 
 // templateHeaders 模板表头（标准列名）。
-var templateHeaders = []string{"物料名称", "CAS号", "化学式", "分子量", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "备注"}
+var templateHeaders = []string{"物料名称", "CAS号", "化学式", "分子量", "物料备注", "价格", "价格单位", "数量级", "供应商", "日期", "规格", "含量", "价格备注"}
 
 // headerAliases 表头别名容错匹配。
 var headerAliases = map[string][]string{
@@ -41,7 +41,14 @@ var headerAliases = map[string][]string{
 	"数量级":  {"数量级", "规模", "采购数量级", "采购规模", "price scale", "scale", "pack size"},
 	"规格":   {"规格", "spec", "规格型号"},
 	"含量":   {"含量", "纯度", "含量%", "assay", "纯度%"},
-	"备注":   {"备注", "note", "注释", "说明"},
+	// 两个备注列必须排在裸「备注」之前：matchHeader 遍历 map 的顺序是随机的，
+	// 若裸「备注」先被匹配，它就会把标题为「物料备注」的列整个占走（反之亦然）。
+	// 有了这两条，「物料备注」「价格备注」各自是确定命中的，撞车概率随之降到最低。
+	"物料备注": {"物料备注", "物料备注信息", "material note"},
+	"价格备注": {"价格备注", "价格备注信息", "报价备注", "price note"},
+	// 裸「备注」是拆分之前的旧模板写法，现在退化成价格备注的别名；
+	// 这两个通名仍留着，让「注释」「说明」这类旧表头继续有去处（见 noteColumn）。
+	"备注": {"备注", "note", "注释", "说明"},
 }
 
 // normalizeHeader 将表头标准化（小写、去空格、去括号）。
@@ -94,7 +101,7 @@ func (s *ExcelService) DownloadTemplate() ([]byte, error) {
 	}
 	_ = f.SetSheetRow(sheet, "A1", &headers)
 	// 示例行
-	example := []any{"甲醇", "67-56-1", "CH4O", "32.04", "3.5", "元/kg", models.PriceScaleKg, "示例供应商", "2026-08-25", "AR", "99.5", "示例"}
+	example := []any{"甲醇", "67-56-1", "CH4O", "32.04", "示例", "3.5", "元/kg", models.PriceScaleKg, "示例供应商", "2026-08-25", "AR", "99.5", "示例"}
 	_ = f.SetSheetRow(sheet, "A2", &example)
 	_ = f.SetColWidth(sheet, "A", "M", 18)
 	// 数量级列做成下拉：这一列是枚举，手输容易写成「KG」「1吨」这类
@@ -197,9 +204,9 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 	for _, m := range list {
 		// 价格记录：最新模式取单条，全部模式取所有（降序）
 		type priceRow struct {
-			price, unit, priceScale, supplier, spec string
-			date                                    string
-			content                                 float64
+			price, unit, priceScale, supplier, spec, note string
+			date                                          string
+			content                                       float64
 		}
 		var prices []priceRow
 		if allPrices {
@@ -210,7 +217,7 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 			for _, p := range ps {
 				prices = append(prices, priceRow{
 					price: fmt.Sprintf("%g", p.Price), unit: p.Unit, priceScale: p.PriceScale,
-					supplier: p.Supplier, spec: p.Spec,
+					supplier: p.Supplier, spec: p.Spec, note: p.Note,
 					date: p.Date.Format("2006-01-02"), content: p.Content,
 				})
 			}
@@ -223,12 +230,12 @@ func (s *ExcelService) ExportMaterials(allPrices bool) ([]byte, error) {
 
 		if len(prices) == 0 {
 			// 无价格：仍输出一行物料，价格列为空
-			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), "", "", "", "", "", numOrEmpty(m.Content), m.Note})
+			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), m.Note, "", "", "", "", "", "", numOrEmpty(m.Content), ""})
 			row++
 			continue
 		}
 		for _, p := range prices {
-			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), p.price, p.unit, p.priceScale, p.supplier, p.date, p.spec, numOrEmpty(p.content), m.Note})
+			_ = f.SetSheetRow(sheet, fmt.Sprintf("A%d", row), &[]any{m.Name, m.CAS, m.Formula, numOrEmpty(m.MolWeight), m.Note, p.price, p.unit, p.priceScale, p.supplier, p.date, p.spec, numOrEmpty(p.content), p.note})
 			row++
 		}
 	}
@@ -339,11 +346,16 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 	if _, ok := colMap["CAS号"]; !ok {
 		return nil, fmt.Errorf("未找到 CAS 列（表头请使用「CAS」或「CAS号」等）")
 	}
-	// 表头是「备注」还是「数量级」会决定这一列按哪一种读。
-	// 两者别名里都有「说明」这类词，万一撞车要让用户知道，否则整列数据会静默读错。
-	if noteCol, ok := colMap["备注"]; ok {
-		if scaleCol, ok2 := colMap["数量级"]; ok2 && noteCol == scaleCol {
-			return nil, fmt.Errorf("表头「数量级」与「备注」指向同一列，请改用完整表头（见导入模板）")
+	// 两个标准列抢同一格时，整列数据会按后写的那条读——静默读错比报错难查得多，
+	// 所以在做任何写入之前先拒掉。只有表头本身就是「备注」这种含混写法才会触发：
+	// 带前缀的「物料备注」「价格备注」在别名表里各自确定命中，撞不上。
+	for _, conflict := range [][2]string{
+		{"数量级", "备注"}, {"物料备注", "备注"}, {"价格备注", "备注"}, {"物料备注", "价格备注"},
+	} {
+		a, okA := colMap[conflict[0]]
+		b, okB := colMap[conflict[1]]
+		if okA && okB && a == b {
+			return nil, fmt.Errorf("表头「%s」与「%s」指向同一列，请改用完整表头（见导入模板）", conflict[0], conflict[1])
 		}
 	}
 
@@ -364,6 +376,11 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			continue
 		}
 
+		// 备注拆成了两列：一列给物料，一列给这条价格记录。
+		// 裸「备注」列只当价格备注用（见 noteColumn）。
+		materialNote := noteColumn(get, "物料备注")
+		priceNote := noteColumn(get, "价格备注")
+
 		// 解析物料字段
 		material := &models.Material{
 			Name:      get("物料名称"),
@@ -371,7 +388,7 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			Formula:   get("化学式"),
 			MolWeight: parseFloat(get("分子量")),
 			Content:   parseFloat(get("含量")),
-			Note:      get("备注"),
+			Note:      materialNote,
 		}
 
 		// 匹配库中已有物料：先按名称，再按 CAS。
@@ -467,7 +484,7 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 			Supplier:   get("供应商"),
 			Spec:       get("规格"),
 			Content:    parseFloat(get("含量")),
-			Note:       get("备注"),
+			Note:       priceNote,
 		}
 		dateStr := get("日期")
 		p.Date, err = parseDateFlexible(dateStr, f, sheets[0], colMap["日期"], lineNo)
@@ -486,6 +503,23 @@ func (s *ExcelService) ImportFromBytes(data []byte, filename string) (*ImportRes
 	}
 
 	return result, nil
+}
+
+// noteColumn 取某个备注列的内容：先认自己的专用列（「物料备注」/「价格备注」），
+// 没有才退回裸「备注」。
+//
+// 裸「备注」只归价格备注：它是拆分之前模板里唯一的一列，那时无论填什么都会
+// 同时写进物料和价格。拆分后它退化成价格备注的别名——不再往物料上写，
+// 免得一份内容在两处各存一份（保存方案时会一起带走）。
+// 专用列有值就不回退，否则裸列的残值会盖掉用户明确写的那一列。
+func noteColumn(get func(string) string, dedicated string) string {
+	if v := get(dedicated); v != "" {
+		return v
+	}
+	if dedicated == "价格备注" {
+		return get("备注")
+	}
+	return ""
 }
 
 // parseDateFlexible 解析日期：支持字符串（2026-08-25）、Excel 序列号，
