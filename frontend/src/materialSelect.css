@@ -1,0 +1,21 @@
+/* 物料下拉（原料名称 / 选物料两列）。
+ *
+ * 这两列都很窄（COL_SEL = 94），下拉若按列宽弹出，「名称 + CAS」会被截掉一半，
+ * 所以两处都设了 popupMatchSelectWidth={false}，宽度改由这里定。
+ *
+ * 固定 340px 是权衡的结果：实测库里 880 条物料，名称 + CAS 的中位数 145px、
+ * 90 分位 231px，而最长的 3 条 IUPAC 名要到 650px。让下拉跟着最长的那条变宽，
+ * 等于为了 2.6% 的行让其余 97% 中间空出一大段——实测那样下拉恒为 658px，
+ * 短名称的行大片留白。340px 覆盖到 90 分位还留了余量，实测只有 23/880 条
+ * 末尾省略号，完整值在该列自己的 Tooltip 里（ReagentNameCell），
+ * 或选到后填入相邻的 CAS 列都能看到。
+ *
+ * 改锚点为左侧：在「选物料」这种靠右的列上，下拉会比控件宽出很多，
+ * 默认的右对齐锚点会把右侧内容顶出视口。
+ */
+.material-select-popup.ant-select-dropdown {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  inset-inline-start: 0 !important;
+  inset-inline-end: auto !important;
+}

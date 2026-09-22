@@ -86,7 +86,17 @@ export default function ProductTable({ step, materials, result, rows, hoverActio
             },
           }}
           value={p.materialId || undefined}
-          options={materials.map((m) => ({ value: m.id, label: m.name }))}
+          // 列宽只有 COL_SEL，按列宽弹出的下拉装不下「名称 + CAS」，两者都会被截断。
+          // 解绑列宽后由 materialSelect.css 给定固定宽度。
+          popupMatchSelectWidth={false}
+          classNames={{ popup: { root: 'material-select-popup' } }}
+          options={materials.map((m) => ({
+            value: m.id,
+            // CAS 紧跟名称（不右对齐，否则短名称的行中间会空出一大段）
+            label: m.cas ? (
+              <>{m.name}<span style={{ color: '#999', marginLeft: 8 }}>{m.cas}</span></>
+            ) : m.name,
+          }))}
           onChange={(v) => {
             const m = materials.find((x) => x.id === v);
             if (m)

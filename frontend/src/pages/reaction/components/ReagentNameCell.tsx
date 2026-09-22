@@ -74,8 +74,17 @@ function nameHints(r: ReagentRow, s: NameCellState): { select: string; link: str
 
 /** 名称下拉的候选项：库中全部物料；未关联行在最前插入哨兵项保持名称可见 */
 function materialOptions(materials: MaterialWithPrice[], s: NameCellState, name: string) {
-    const options: { value: number; label: string; disabled?: boolean }[] =
-        materials.map(m => ({ value: m.id, label: m.name }))
+    // 下拉项要给全「名称 + CAS」：只显示名称时，同名或名字相近的几个物料
+    // 在下拉里长得一模一样，根本没法选。CAS 是唯一能把它们区分开的字段。
+    const options: { value: number; label: React.ReactNode; disabled?: boolean }[] =
+        materials.map(m => ({
+            value: m.id,
+            // 与「选物料」列同一套排法：CAS 紧随名称（不右对齐，否则短名称的行
+            // 中间会空出一大段）。
+            label: m.cas ? (
+                <>{m.name}<span style={{ color: '#999', marginLeft: 8 }}>{m.cas}</span></>
+            ) : m.name,
+        }))
     if (s.unbound) {
         options.unshift({ value: UNBOUND_MATERIAL, label: sentinelText(name, s.sameName), disabled: !s.canAutoLink })
     }
@@ -106,6 +115,10 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
     const select = (
         <Select
             size="small" allowClear style={fullInput} placeholder="选择物料"
+            // 列宽只有 94，按列宽弹出的下拉会把「名称 + CAS」截掉一半，
+            // 故解绑列宽，宽度与锚点交给 materialSelect.css
+            popupMatchSelectWidth={false}
+            classNames={{ popup: { root: 'material-select-popup' } }}
             showSearch={{
                 optionFilterProp: 'label',
                 // 显示只有名称（避免长名称被 CAS 挤掉），但搜索按「名称 + CAS」，CAS 依然可搜
