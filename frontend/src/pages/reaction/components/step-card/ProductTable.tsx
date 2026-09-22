@@ -70,6 +70,10 @@ export default function ProductTable({ step, materials, result, rows, hoverActio
       width: COL_SEL,
       align: 'center',
       render: (_, p) => (
+        // 气泡套在外层 span 上，不能直接包 <Select>：antd Tooltip 需要一个
+        // 能接收 ref 的 DOM 元素，包组件时气泡不出现（实测）。
+        <Tooltip title={p.name}>
+        <span style={{ display: 'block', width: '100%' }}>
         <Select
           size='small'
           allowClear
@@ -90,8 +94,12 @@ export default function ProductTable({ step, materials, result, rows, hoverActio
           // 解绑列宽后由 materialSelect.css 给定固定宽度。
           popupMatchSelectWidth={false}
           classNames={{ popup: { root: 'material-select-popup' } }}
+          // 选中值取 displayName（名称），下拉项用 label（名称 + CAS）。
+          // 不靠 labelRender 定制：它是否被采纳随 antd 版本而变。
+          optionLabelProp='displayName'
           options={materials.map((m) => ({
             value: m.id,
+            displayName: m.name,
             // CAS 紧跟名称（不右对齐，否则短名称的行中间会空出一大段）
             label: m.cas ? (
               <>{m.name}<span style={{ color: '#999', marginLeft: 8 }}>{m.cas}</span></>
@@ -110,6 +118,8 @@ export default function ProductTable({ step, materials, result, rows, hoverActio
             else updateProduct(p._key, { materialId: 0 });
           }}
         />
+        </span>
+        </Tooltip>
       ),
     },
     {

@@ -76,9 +76,13 @@ function nameHints(r: ReagentRow, s: NameCellState): { select: string; link: str
 function materialOptions(materials: MaterialWithPrice[], s: NameCellState, name: string) {
     // 下拉项要给全「名称 + CAS」：只显示名称时，同名或名字相近的几个物料
     // 在下拉里长得一模一样，根本没法选。CAS 是唯一能把它们区分开的字段。
-    const options: { value: number; label: React.ReactNode; disabled?: boolean }[] =
+    // label 是「下拉项」显示的内容（名称 + CAS），displayName 是「选中后」显示的内容
+    // （只要名称）。两者必须分开：rc-select 默认拿选项的 label 当选中值显示，
+    // 不分开的话选中后也会带上 CAS（见 optionLabelProp）。
+    const options: { value: number; label: React.ReactNode; displayName: React.ReactNode; disabled?: boolean }[] =
         materials.map(m => ({
             value: m.id,
+            displayName: m.name,
             // 与「选物料」列同一套排法：CAS 紧随名称（不右对齐，否则短名称的行
             // 中间会空出一大段）。
             label: m.cas ? (
@@ -86,7 +90,14 @@ function materialOptions(materials: MaterialWithPrice[], s: NameCellState, name:
             ) : m.name,
         }))
     if (s.unbound) {
-        options.unshift({ value: UNBOUND_MATERIAL, label: sentinelText(name, s.sameName), disabled: !s.canAutoLink })
+        const text = sentinelText(name, s.sameName)
+        // 哨兵项选中后要橙显，所以 displayName 传节点而不是字符串
+        options.unshift({
+            value: UNBOUND_MATERIAL,
+            label: text,
+            displayName: <span style={{ color: '#faad14' }}>{text}</span>,
+            disabled: !s.canAutoLink,
+        })
     }
     return options
 }
@@ -128,14 +139,10 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
                     return hay.includes(input.trim().toLowerCase())
                 },
             }}
+            // 选中值取 displayName（名称），下拉项仍用 label（名称 + CAS）
+            optionLabelProp='displayName'
             value={bound ? r.materialId : (unbound ? UNBOUND_MATERIAL : undefined)}
             options={options}
-            // 未关联物料库的行用橙色字体标出
-            labelRender={(props: { value?: unknown; label?: React.ReactNode }) =>
-                props.value === UNBOUND_MATERIAL
-                    ? <span style={{ color: '#faad14' }}>{props.label}</span>
-                    : <>{props.label}</>
-            }
             onChange={(v) => {
                 if (v === UNBOUND_MATERIAL) return // 哨兵只用于显示名称，关联走右侧按钮
                 if (v) { onPick(r, v) }
@@ -155,14 +162,20 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
         </Tooltip>
     )
 
-    // 已关联行也渲染同样的 flex 容器与按钮占位，
+    // 已关联行也渲染同样的 flex 容器与按钮占位。
+    //
+    // 气泡不给 Select 的 labelRender，而是套在外层 span 上：labelRender 是定制
+    // 下拉项 label 的，和选中值显示不是一回事（选中值由 optionLabelProp 决定）。
+    // 未关联行沿用原先那条说明文案，其余情况给名称。
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Tooltip title={hints.wrap}>
-                <div style={{ flex: 1, minWidth: 0 }}>{select}</div>
-            </Tooltip>
-            {linkBtn}
-        </div>
+        // Tooltip 必须包在一个能接收 ref 的 DOM 元素上：直接包 <Select> 时
+        // antd 转发不了 ref，气泡不会出现（实测无气泡）。
+        <Tooltip title={unbound ? hints.wrap : r.name}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <span style={{ flex: 1, minWidth: 0 }}>{select}</span>
+                {linkBtn}
+            </span>
+        </Tooltip>
     )
 }
 

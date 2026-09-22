@@ -46,10 +46,6 @@ export default function ReadOnlyCell({
  * 与 ReadOnlyCell 分开是因为取舍不同——那个放的是数值，宽度可控，装不下说明
  * 列宽配错了；这里放的是 CAS 这类外部录入的字符串，长度不受控（导入的 Excel
  * 里可能出现任意写法），只能截断兜底。
- *
- * 截断交给 CSS（text-overflow: ellipsis），不做 JS 量宽：列宽固定，量宽要等
- * 布局完成、还要在窗口缩放时重算，代价远大于收益。代价是内容恰好等于列宽时
- * 也会带上气泡，但那本来也无害。
  */
 export function ReadOnlyTextCell({
   text,
@@ -63,6 +59,9 @@ export function ReadOnlyTextCell({
 }) {
   return (
     <ReadOnlyCell align={align}>
+      {/* title 始终挂着：antd Tooltip 自己判断不了是否溢出，而在渲染阶段读
+          scrollWidth 再去 setState 会触发 React 的「渲染期间读布局」警告。
+          代价是内容放得下时悬停也会弹一次，但内容与原文一致，无害。 */}
       <Tooltip title={text}>
         <span
           style={{
