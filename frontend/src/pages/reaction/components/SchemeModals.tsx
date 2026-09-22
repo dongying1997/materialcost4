@@ -35,13 +35,13 @@ function SchemeModals({ saveOpen, loadOpen, form, schemes, onSaveCancel, onSaveO
           dataSource={schemes}
           renderItem={(s) => (
             <List.Item actions={[
-              <Button key="l" type="primary" size="small" icon={<FolderOpenOutlined />}
+              <Button key="l" type="link" size="small" icon={<FolderOpenOutlined />}
                 onClick={() => onLoad(s.id)}>载入</Button>,
               <Popconfirm key="d" title="删除？" onConfirm={() => onDelete(s.id)}>
                 <Button size="small" danger type="link" icon={<DeleteOutlined />}>删除</Button>
               </Popconfirm>,
             ]}>
-              <List.Item.Meta title={s.name} description={`${s.stepCount} 步`} />
+              <List.Item.Meta title={s.name} description={s.note}/>
             </List.Item>
           )}
         />
