@@ -28,15 +28,25 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice, current, pag
   }
 
   const columns = useMemo<ColumnsType<MaterialWithPrice>>(() => [
-    { title: '编码', dataIndex: 'code', width: 70, align: 'center',render: v => v || '-' },
-    { title: '名称', dataIndex: 'name', width: 130, render: v => v || '-' },
+    { title: '编码', dataIndex: 'code', width: 70, align: 'center', render: v => v || '-' },
+    {
+      title: '名称', dataIndex: 'name', width: 130,
+      render: (_, r) => r.name ? (<Tooltip title={r.note || ""}>{r.name}</Tooltip>) : '-'
+    },
     { title: 'CAS', dataIndex: 'cas', width: 100, render: v => v || '-' },
     { title: '化学式', dataIndex: 'formula', width: 100, render: v => v || '-' },
     { title: '分子量', dataIndex: 'molWeight', width: 100, render: v => v || '-' },
     {
       title: '当前价格', width: 100,
       render: (_, r) => r.priceCount ? (
-        <Tooltip title={`供应商：${r.supplier || '-'}　日期：${r.priceDate || '-'}`}>
+        <Tooltip title={
+          <div style={{ maxWidth: 240, lineHeight: 1.6 }}>
+            <div>供应商：{r.supplier || '-'}</div>
+            <div>日期：{r.priceDate || '-'}</div>
+            <div>备注：{r.note || '-'}</div>
+
+          </div>
+        }>
           <span>{fmtMoney(r.price)} <span style={{ color: '#999', fontSize: 12 }}>{r.priceUnit}</span></span>
         </Tooltip>
       ) : <span style={{ color: '#999' }}>暂无</span>,
