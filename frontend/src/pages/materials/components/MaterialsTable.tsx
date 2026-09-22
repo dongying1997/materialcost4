@@ -2,8 +2,8 @@ import { useMemo, useRef } from 'react'
 import { Table, Space, Button, Tooltip, Popconfirm } from 'antd'
 import { HistoryOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import type { MaterialWithPrice } from '../types'
-import { fmtMoney } from '../utils/file'
+import type { MaterialWithPrice } from '@/types'
+import { fmtMoney } from '@/shared/utils/format'
 
 interface Props {
   list: MaterialWithPrice[]

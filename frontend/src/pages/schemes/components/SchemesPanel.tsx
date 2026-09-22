@@ -1,7 +1,7 @@
 import { Card, Space, List, Empty, Button, Popconfirm, Checkbox, Tooltip } from 'antd'
 import { FolderOpenOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons'
-import { fmtDateTime, fmtMoney } from '../utils/file'
-import type { SchemeSummary } from '../types'
+import { fmtDateTime, fmtMoney } from '@/shared/utils/format'
+import type { SchemeSummary } from '@/types'
 
 interface Props {
   schemes: SchemeSummary[]

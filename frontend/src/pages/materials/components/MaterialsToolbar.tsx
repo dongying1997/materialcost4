@@ -3,7 +3,7 @@ import {
   PlusOutlined, SearchOutlined, UploadOutlined, DownloadOutlined, ExportOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
-import ToolbarStrip from './ToolbarStrip'
+import ToolbarStrip from '@/shared/components/ToolbarStrip'
 
 interface Props {
   importing: boolean

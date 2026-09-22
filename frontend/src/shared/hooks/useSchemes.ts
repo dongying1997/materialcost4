@@ -2,10 +2,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
 import { Modal } from 'antd'
-import { SchemeService } from '../bindings'
-import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '../types'
-import { stepsToPayload, stepsFromScheme, newStep } from '../utils/reaction'
-import { fileToBase64 } from '../utils/file'
+import { SchemeService } from '@/lib/bindings'
+import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '@/types'
+import { stepsToPayload, stepsFromScheme, newStep } from '@/lib/reaction'
+import { fileToBase64 } from '@/shared/utils/file'
 
 // 定义SchemeApi接口
 export interface SchemeApi {

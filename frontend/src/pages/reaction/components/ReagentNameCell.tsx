@@ -1,6 +1,6 @@
 import { Button, Select, Tooltip } from 'antd'
 import { LinkOutlined } from '@ant-design/icons'
-import type { MaterialWithPrice, ReagentRow } from '../types'
+import type { MaterialWithPrice, ReagentRow } from '@/types'
 
 /**
  * 原料「名称」单元格。

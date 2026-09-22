@@ -18,11 +18,11 @@
  */
 import { useCallback, useRef, useState } from 'react'
 import { Input, Tooltip } from 'antd'
-import type { DecStr } from '../utils/decimal'
+import type { DecStr } from '@/shared/utils/decimal'
 import {
   MAX_SIG_DIGITS, compareDecimal, formatRule, isClampedForDisplay,
   isDecimal, normalize,
-} from '../utils/decimal'
+} from '@/shared/utils/decimal'
 
 interface Props {
   value: DecStr | null

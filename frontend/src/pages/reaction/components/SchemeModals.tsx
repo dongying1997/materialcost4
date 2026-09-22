@@ -1,7 +1,7 @@
 import { Modal, Form, Input, List, Button, Popconfirm } from 'antd'
 import { FolderOpenOutlined, DeleteOutlined } from '@ant-design/icons'
 import type { FormInstance } from 'antd'
-import type { SchemeSummary } from '../types'
+import type { SchemeSummary } from '@/types'
 
 interface Props {
   saveOpen: boolean

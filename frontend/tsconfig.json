@@ -10,7 +10,7 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     /* 源码统一用 @/ 引用 src 下的模块，与 vite.config.ts 的 resolve.alias 对应 */
-    "paths": { "@/*": ["src/*"] },
+    "paths": { "@/*": ["src/*"], "@bindings/*": ["bindings/*"] },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,

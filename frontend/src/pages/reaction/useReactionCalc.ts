@@ -1,12 +1,12 @@
 // 反应计算的核心状态与计算逻辑
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
-import { MaterialService, ReactionService } from '../bindings'
+import { MaterialService, ReactionService } from '@/lib/bindings'
 import type {
   MaterialWithPrice, StepRow, MultiStepResult, MaterialPriceOption,
-} from '../types'
-import { newStep, stepsToPayload, backfillFromResult, upsertPriceOptions } from '../utils/reaction'
-import { usePersistedState } from './useStorage'
+} from '@/types'
+import { newStep, stepsToPayload, backfillFromResult, upsertPriceOptions } from '@/lib/reaction'
+import { usePersistedState } from '@/shared/hooks/useStorage'
 
 // 存储键带 v2：高精度改造把编辑行的数值字段从 number 换成了 DecStr。
 // 换键让老格式直接失效（否则旧 number 数据既取不出来也写不回去），

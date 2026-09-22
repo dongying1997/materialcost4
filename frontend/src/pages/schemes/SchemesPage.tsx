@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { message } from 'antd'
-import { useSchemes } from '../hooks/useSchemes'
-import SchemesPanel from '../components/SchemesPanel'
-import SchemesToolbar from '../components/SchemesToolbar'
-import type { StepRow } from '../types'
+import { useSchemes } from '@/shared/hooks/useSchemes'
+import SchemesPanel from '@/pages/schemes/components/SchemesPanel'
+import SchemesToolbar from '@/pages/schemes/components/SchemesToolbar'
+import type { StepRow } from '@/types'
 
 /** 方案管理页：列出已保存的方案，载入后跳转到反应计算页 */
 function SchemesPage() {

@@ -2,9 +2,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Popconfirm, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { MaterialService } from '../bindings'
-import type { Price, PricePayload, MaterialWithPrice } from '../types'
-import { fmtMoney } from '../utils/file'
+import { MaterialService } from '@/lib/bindings'
+import type { Price, PricePayload, MaterialWithPrice } from '@/types'
+import { fmtMoney } from '@/shared/utils/format'
 
 interface Props {
   material: MaterialWithPrice | null

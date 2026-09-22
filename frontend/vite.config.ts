@@ -9,6 +9,8 @@ export default defineConfig({
     alias: {
       // 源码统一用 @/ 引用 src 下的模块，避免深层目录里叠 ../../..
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Wails 生成的 bindings 在 src 之外，单独给个别名
+      "@bindings": fileURLToPath(new URL("./bindings", import.meta.url)),
     },
   },
   server: {

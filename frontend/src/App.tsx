@@ -6,9 +6,9 @@ import {
   CalculatorOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
-import MaterialsPage from './pages/MaterialsPage'
-import ReactionPage from './pages/ReactionPage'
-import SchemesPage from './pages/SchemesPage'
+import MaterialsPage from '@/pages/materials/MaterialsPage'
+import ReactionPage from '@/pages/reaction/ReactionPage'
+import SchemesPage from '@/pages/schemes/SchemesPage'
 
 const { Header, Content } = Layout
 

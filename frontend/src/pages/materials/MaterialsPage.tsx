@@ -1,11 +1,11 @@
 import { message } from 'antd'
-import { useMaterials } from '../hooks/useMaterials'
-import MaterialsToolbar from '../components/MaterialsToolbar'
-import MaterialsTable from '../components/MaterialsTable'
-import MaterialEditModal from '../components/MaterialEditModal'
-import PriceDrawer from '../components/PriceDrawer'
-import ExportModal from '../components/ExportModal'
-import ClearMaterialsModal from '../components/ClearMaterialsModal'
+import { useMaterials } from '@/pages/materials/useMaterials'
+import MaterialsToolbar from '@/pages/materials/components/MaterialsToolbar'
+import MaterialsTable from '@/pages/materials/components/MaterialsTable'
+import MaterialEditModal from '@/pages/materials/components/MaterialEditModal'
+import PriceDrawer from '@/pages/materials/components/PriceDrawer'
+import ExportModal from '@/pages/materials/components/ExportModal'
+import ClearMaterialsModal from '@/pages/materials/components/ClearMaterialsModal'
 
 /** 物料库页：组合工具栏、列表、编辑弹窗与价格抽屉 */
 function MaterialsPage() {

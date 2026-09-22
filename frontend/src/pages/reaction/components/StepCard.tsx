@@ -5,12 +5,12 @@ import type { ColumnsType } from 'antd/es/table'
 import type {
   MaterialWithPrice, StepResult, ReagentRow, ProductRow, StepRow, IntermediateProduct,
   ReagentResult, ProductResult, PriceSnapshot, MaterialPriceOption,
-} from '../types'
-import { fmtNum, fmtMoney } from '../utils/file'
-import { priceDrifted, priceFromOption, emptyPrice } from '../utils/reaction'
-import { normalize, toNumber } from '../utils/decimal'
-import ReagentNameCell from './nameCell'
-import DecimalInput from './DecimalInput'
+} from '@/types'
+import { fmtNum, fmtMoney } from '@/shared/utils/format'
+import { priceDrifted, priceFromOption, emptyPrice } from '@/lib/reaction'
+import { normalize, toNumber } from '@/shared/utils/decimal'
+import ReagentNameCell from '@/pages/reaction/components/ReagentNameCell'
+import DecimalInput from '@/shared/components/DecimalInput'
 
 // ── 统一列宽：原料表与产物表共用同一套栅格，保证上下对齐 ──────
 // 两表均为 11 列：单选 | 名称区(2列) | 数值列(5列) | 结果列(2列) | 删除
@@ -79,7 +79,7 @@ function ReadOnlyCell({ children, align = 'center' }: {
   )
 }
 
-/** 名称列的形态判定、下拉与关联逻辑见 nameCell.tsx（ReagentNameCell） */
+/** 名称列的形态判定、下拉与关联逻辑见 ReagentNameCell.tsx */
 
 // 需要把换算值补进文案的单位（见 priceOptionLabel）
 const CONVERT_UNITS = new Set(['元/g', '元/mol'])
@@ -323,7 +323,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
           </Tooltip>
         </div>
       ) : (
-        // 其余三种形态（已关联 / 未关联可自动关联 / 未关联需手选）见 nameCell.tsx
+        // 其余三种形态（已关联 / 未关联可自动关联 / 未关联需手选）见 ReagentNameCell.tsx
         <ReagentNameCell row={r} materials={materials}
           onPick={pickMaterial} onClear={updateReagent} />
       ),

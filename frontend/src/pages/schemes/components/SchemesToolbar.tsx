@@ -1,6 +1,6 @@
 import { Button, Typography, Upload } from 'antd'
 import { ExportOutlined, ImportOutlined, DeleteOutlined } from '@ant-design/icons'
-import ToolbarStrip from './ToolbarStrip'
+import ToolbarStrip from '@/shared/components/ToolbarStrip'
 
 interface Props {
   selectedCount: number

@@ -2,10 +2,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
 import { Form, Modal } from 'antd'
-import { MaterialService, ExcelService } from '../bindings'
-import type { Material, MaterialPayload, MaterialWithPrice, Price, PricePayload } from '../types'
-import { fileToBase64 } from '../utils/file'
-import { usePersistedState } from './useStorage'
+import { MaterialService, ExcelService } from '@/lib/bindings'
+import type { Material, MaterialPayload, MaterialWithPrice, Price, PricePayload } from '@/types'
+import { fileToBase64 } from '@/shared/utils/file'
+import { usePersistedState } from '@/shared/hooks/useStorage'
 import dayjs from 'dayjs'
 
 export interface MaterialsApi {

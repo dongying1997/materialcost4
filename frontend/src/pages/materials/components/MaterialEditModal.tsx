@@ -1,7 +1,7 @@
 import { Modal } from 'antd'
 import type { FormInstance } from 'antd'
-import type { Material } from '../types'
-import MaterialForm from './MaterialForm'
+import type { Material } from '@/types'
+import MaterialForm from '@/pages/materials/components/MaterialForm'
 
 interface Props {
   open: boolean

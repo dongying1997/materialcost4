@@ -1,24 +1,9 @@
-// 文件工具：处理 Wails bindings 的 base64 []byte 传输
-import { formatRuleGrouped } from './decimal'
-
-/** 读取 File 为 base64 字符串（传给 Go 的 []byte 参数） */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      // FileReader 的 dataURL 形如 data:application/...;base64,XXXX
-      const idx = result.indexOf(',')
-      resolve(idx >= 0 ? result.slice(idx + 1) : result)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
+// 数值 / 时间格式化：按修约规则 R 展示，规则与 DecimalInput 一致
+import { formatRuleGrouped } from '@/shared/utils/decimal'
 
 /**
  * 数字格式化：按修约规则 R 展示（|v| ≥ 1 保留 2 位小数，|v| < 1 保留 3 位有效数字），
- * 千分位、去尾零。规则与输入框（DecimalInput）一致，见 utils/decimal.ts。
+ * 千分位、去尾零。规则与输入框（DecimalInput）一致，见 shared/utils/decimal.ts。
  * 保留 digits 参数是为了兼容既有调用点，显式传入时按调用方指定的小数位。
  */
 export function fmtNum(v: number | null | undefined, digits?: number): string {

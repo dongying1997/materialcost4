@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Modal, Input, Typography, Alert, Space } from 'antd'
-import { MaterialService } from '../bindings'
-import type { MaterialWithPrice } from '../types'
+import { MaterialService } from '@/lib/bindings'
+import type { MaterialWithPrice } from '@/types'
 
 const CONFIRM_WORD = '清空'
 

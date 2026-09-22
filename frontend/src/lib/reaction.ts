@@ -1,8 +1,8 @@
 // 反应计算的辅助函数：步骤对象构造与前后端数据序列化
 import type {
   StepRow, MultiStepResult, ReactionStep, MaterialPriceOption, PriceSnapshot, DecStr,
-} from '../types'
-import { normalize, toNumber } from './decimal'
+} from '@/types'
+import { normalize, toNumber } from '@/shared/utils/decimal'
 
 /** 价格快照与库中最新价的差异阈值（元/kg），超过则提示用户 */
 export const PRICE_DRIFT_THRESHOLD = 0.01
