@@ -6,17 +6,13 @@
 name: "materialcost4"
 arch: ${GOARCH}
 platform: "linux"
-version: "0.3.0"
+version: "0.4.0"
 section: "default"
 priority: "extra"
 maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "化学反应的物料成本计算工具"
 vendor: "dongying1997"
-# ⚠️ 注意：`homepage` 与 `license` 被 `update:build-assets` 生成器覆盖过——
-# 跑完该任务必须检查这两行，生成器只会写回 wails 模板的默认值
-# （homepage 变 https://wails.io、license 变 MIT）。
 homepage: "https://github.com/dongying1997/materialcost4"
-# 本项目尚未添加 LICENSE，此处不能声明具体许可证（见 README 的「许可」一节）。
 license: "Proprietary"
 release: "1"
 
@@ -82,3 +78,8 @@ scripts:
 #   - not-foo
 #   - not-bar
 # changelog: "changelog.yaml"
+
+# ⚠️ 注意：本文件是 `update:build-assets` 生成器的产物，跑完该任务会把上面两行
+# 覆盖回 wails 模板的默认值（homepage → https://wails.io、license → MIT）。
+# 本项目尚未添加 LICENSE，声明 MIT 是虚假许可声明（见 README「许可」一节），
+# 每次生成后都要把 homepage 与 license 改回来。
