@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Select, Popconfirm, message } from 'antd'
+import { Drawer, Table, Button, Space, Modal, Form, Input, InputNumber, DatePicker, Select, Tooltip, Popconfirm, message } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { MaterialService } from '@/lib/bindings'
@@ -99,7 +99,7 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
         title={material ? `价格历史 — ${material.name}（${material.cas || '无 CAS'}）` : '价格历史'}
         open={open}
         onClose={onClose}
-        width={780}
+        width={880}
       >
         <div style={{ marginBottom: 12 }}>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增价格</Button>
@@ -116,8 +116,12 @@ function PriceDrawer({ material, open, onClose, onChanged }: Props) {
             { title: '数量级', dataIndex: 'priceScale', width: 76, align: 'center', render: v => v || '-' },
             { title: '供应商', dataIndex: 'supplier', width: 120, align: 'center', render: v => v || '-' },
             { title: '日期', dataIndex: 'date', width: 120 , align: 'center',render: v => dayjs(v).format('YYYY-MM-DD') },
-            { title: '规格', dataIndex: 'spec', width: 100, render: v => v || '-' },
+            { title: '规格', dataIndex: 'spec', width: 100, align: 'center',render: v => v || '-' },
             { title: '含量%', dataIndex: 'content', width: 70, align: 'center', render: v => (v ? `${v}%` : '-') },
+            {
+              title: '价格备注', dataIndex: 'note', width: 140,align: 'center',
+              render: v => v ? <Tooltip title={v}>{v}</Tooltip> : '-',
+            },
             {
               title: '操作', width: 110,align: 'center',
               render: (_, r) => (

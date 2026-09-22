@@ -37,6 +37,10 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice, current, pag
     { title: '化学式', dataIndex: 'formula', width: 100, render: v => v || '-' },
     { title: '分子量', dataIndex: 'molWeight', width: 100, render: v => v || '-' },
     {
+      title: '物料备注', dataIndex: 'note', width: 100,
+      render: v => v ? <Tooltip title={v}>{v}</Tooltip> : '-',
+    },
+    {
       title: '参考价格', width: 100,
       render: (_, r) => r.priceCount ? (
         <Tooltip title={
@@ -77,7 +81,9 @@ function MaterialsTable({ list, loading, onEdit, onDelete, onPrice, current, pag
           showTotal: t => `共 ${t} 条`,
           onChange: handlePageChange,
         }}
-        size="middle"
+        // small 而非默认的 middle：行高明显更矮，一屏能多看好几行；
+        // 价格抽屉里的表本来就是这个尺寸，两处一致
+        size="small"
       />
     </div>
   )
