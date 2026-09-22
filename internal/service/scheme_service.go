@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -146,6 +147,8 @@ func (s *SchemeService) GetScheme(id int64) (*models.Scheme, error) {
 
 // SaveScheme 保存方案（id 为 0 时新增）。
 func (s *SchemeService) SaveScheme(sch *models.Scheme) (*models.Scheme, error) {
+	// 先 trim 再判空：否则「   」这种全空白名称能绕过判空落库
+	sch.Name = strings.TrimSpace(sch.Name)
 	if sch.Name == "" {
 		return nil, fmt.Errorf("方案名称不能为空")
 	}
@@ -161,6 +164,27 @@ func (s *SchemeService) SaveScheme(sch *models.Scheme) (*models.Scheme, error) {
 		}
 	}
 	return s.schemeRepo.Get(sch.ID)
+}
+
+// RenameScheme 只改方案名称（顺带保留备注），不刷新 updated_at。
+//
+// 有意不复用 SaveScheme：那条路径是「整行更新 + 刷新 updated_at」，
+// 适合从编辑器保存完整方案，但改名只需要动名称。这样既避免前端为了
+// 改名把整行（含 steps 与 base64 附图，可能几 MB）拉回来再写回去，
+// 也让 updated_at / 列表排序保持「内容最后变更」的语义。
+func (s *SchemeService) RenameScheme(id int64, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("方案名称不能为空")
+	}
+	sch, err := s.schemeRepo.Get(id)
+	if err != nil {
+		return err
+	}
+	if sch == nil {
+		return fmt.Errorf("方案不存在，可能已被删除")
+	}
+	return s.schemeRepo.Rename(id, name, sch.Note)
 }
 
 // DeleteScheme 删除方案。

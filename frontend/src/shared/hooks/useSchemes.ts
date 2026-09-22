@@ -1,6 +1,7 @@
-// 方案管理：方案列表、保存与删除
+// 方案管理：方案列表、保存、改名与删除
 import { useEffect, useState, useCallback } from 'react'
 import type { MessageInstance } from 'antd/es/message/interface'
+import type { FormInstance } from 'antd'
 import { Modal } from 'antd'
 import { SchemeService } from '@/lib/bindings'
 import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '@/types'
@@ -13,10 +14,17 @@ export interface SchemeApi {
   selectedIds: number[]
   exporting: boolean
   importing: boolean
+  /** 正在改名的方案；null 表示改名弹窗关闭 */
+  renaming: SchemeSummary | null
+  /** 改名请求进行中（用于弹窗确认按钮的 loading） */
+  renamingSaving: boolean
   loadSchemes: () => void
   saveScheme: (name: string, note: string, steps: StepRow[], image: string) => Promise<boolean>
   loadSchemeById: (id: number) => Promise<void>
   deleteSchemeById: (id: number) => Promise<void>
+  openRename: (s: SchemeSummary) => void
+  closeRename: () => void
+  renameScheme: (form: FormInstance) => Promise<void>
   toggleSelect: (id: number) => void
   clearSelection: () => void
   exportSchemes: (ids: number[]) => Promise<void>
@@ -25,7 +33,7 @@ export interface SchemeApi {
 }
 
 /**
- * 方案管理：加载方案列表、保存 / 载入 / 删除方案。
+ * 方案管理：加载方案列表、保存 / 载入 / 改名 / 删除方案。
  * @param onLoaded 载入方案后的回调（把步骤注入编辑器）
  * @returns SchemeApi
  */
@@ -37,6 +45,8 @@ export function useSchemes(
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [renaming, setRenaming] = useState<SchemeSummary | null>(null)
+  const [renamingSaving, setRenamingSaving] = useState(false)
 
   // 加载方案列表
   const loadSchemes = useCallback(async () => {
@@ -88,6 +98,30 @@ export function useSchemes(
       loadSchemes()
     } catch (e) {
       messageApi.error(String(e))
+    }
+  }
+
+  const openRename = (s: SchemeSummary) => setRenaming(s)
+  const closeRename = () => setRenaming(null)
+
+  // 改名走 RenameScheme 专用接口，而不是 SaveScheme：后者是整行更新
+  // （steps / image / updated_at 全写一遍），改名只需动名称。用专用接口
+  // 既不用为了改名把整行方案（含 base64 附图）拉回来再写回去，也保住了
+  // updated_at 的语义——它是列表的排序键，刷新它会让纯改名把方案顶到最前。
+  const renameScheme = async (form: FormInstance) => {
+    const current = renaming
+    if (!current) return
+    const values = await form.validateFields()
+    setRenamingSaving(true)
+    try {
+      await SchemeService.RenameScheme(current.id, values.name)
+      messageApi.success('方案已重命名')
+      closeRename()
+      loadSchemes()
+    } catch (e) {
+      messageApi.error(String(e))
+    } finally {
+      setRenamingSaving(false)
     }
   }
 
@@ -153,8 +187,9 @@ export function useSchemes(
   }
 
   return {
-    schemes, selectedIds, exporting, importing,
+    schemes, selectedIds, exporting, importing, renaming, renamingSaving,
     loadSchemes, saveScheme, loadSchemeById, deleteSchemeById,
+    openRename, closeRename, renameScheme,
     toggleSelect, clearSelection, exportSchemes, importSchemes, deleteSelected,
   }
 }

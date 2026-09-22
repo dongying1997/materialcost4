@@ -78,6 +78,18 @@ export function ListSchemes(): $CancellablePromise<($models.SchemeSummary | null
 }
 
 /**
+ * RenameScheme 只改方案名称（顺带保留备注），不刷新 updated_at。
+ * 
+ * 有意不复用 SaveScheme：那条路径是「整行更新 + 刷新 updated_at」，
+ * 适合从编辑器保存完整方案，但改名只需要动名称。这样既避免前端为了
+ * 改名把整行（含 steps 与 base64 附图，可能几 MB）拉回来再写回去，
+ * 也让 updated_at / 列表排序保持「内容最后变更」的语义。
+ */
+export function RenameScheme(id: number, name: string): $CancellablePromise<void> {
+    return $Call.ByID(2769981747, id, name);
+}
+
+/**
  * SaveScheme 保存方案（id 为 0 时新增）。
  */
 export function SaveScheme(sch: models$0.Scheme | null): $CancellablePromise<models$0.Scheme | null> {

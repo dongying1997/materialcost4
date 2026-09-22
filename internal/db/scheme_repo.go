@@ -47,6 +47,17 @@ func (r *SchemeRepo) Update(s *models.Scheme) error {
 	return err
 }
 
+// Rename 只更新方案名称与备注，不触碰 updated_at 与方案内容。
+//
+// 与 Update 分开是有意的：updated_at 记录的是「内容最后变更时间」，
+// 而它同时还是 List 的排序键（ORDER BY updated_at DESC）。走 Update 改名
+// 会让一次纯改名的操作把方案顶到列表最前，看起来像内容也变了。
+// 这里刻意不在 SQL 里出现 updated_at，也不要求调用方先读出整行。
+func (r *SchemeRepo) Rename(id int64, name, note string) error {
+	_, err := r.db.Exec(`UPDATE schemes SET name=?, note=? WHERE id=?`, name, note, id)
+	return err
+}
+
 // Delete 删除方案。
 func (r *SchemeRepo) Delete(id int64) error {
 	_, err := r.db.Exec(`DELETE FROM schemes WHERE id=?`, id)

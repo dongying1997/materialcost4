@@ -1,5 +1,5 @@
 import { Card, Space, List, Empty, Button, Popconfirm, Checkbox, Tooltip } from 'antd'
-import { FolderOpenOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons'
+import { FolderOpenOutlined, DeleteOutlined, EditOutlined, WarningOutlined } from '@ant-design/icons'
 import { fmtDateTime, fmtMoney } from '@/shared/utils/format'
 import type { SchemeSummary } from '@/types'
 
@@ -9,6 +9,8 @@ interface Props {
   onToggleSelect: (id: number) => void
   /** 载入时才按 id 拉取完整方案，列表项本身不再携带 steps */
   onLoad: (id: number) => void
+  /** 改名：只改名称，方案内容仍以编辑器里的为准 */
+  onRename: (scheme: SchemeSummary) => void
   onDelete: (id: number) => void
 }
 
@@ -35,7 +37,7 @@ function ResultSummary({ s }: { s: SchemeSummary }) {
 }
 
 /** 方案管理面板：列出已保存的方案，支持勾选多个方案批量操作 */
-function SchemesPanel({ schemes, selectedIds, onToggleSelect, onLoad, onDelete }: Props) {
+function SchemesPanel({ schemes, selectedIds, onToggleSelect, onLoad, onRename, onDelete }: Props) {
   const isSelected = (id: number) => selectedIds.includes(id)
   return (
     <Card>
@@ -49,6 +51,8 @@ function SchemesPanel({ schemes, selectedIds, onToggleSelect, onLoad, onDelete }
                 actions={[
                   <Button key="load" size="small" type="link" icon={<FolderOpenOutlined />}
                     onClick={() => onLoad(s.id)}>载入</Button>,
+                  <Button key="edit" size="small" type="link" icon={<EditOutlined />}
+                    onClick={() => onRename(s)}>编辑</Button>,
                   <Popconfirm key="del" title="删除该方案？" onConfirm={() => onDelete(s.id)}>
                     <Button size="small" type="link" danger icon={<DeleteOutlined />}>删除</Button>
                   </Popconfirm>,

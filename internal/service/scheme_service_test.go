@@ -83,6 +83,73 @@ func TestSchemeSaveLoad(t *testing.T) {
 	}
 }
 
+// TestSchemeRenameKeepsUpdatedAt 改名只动名称，不刷新 updated_at。
+//
+// updated_at 同时是列表的排序键，改名若刷新它会把方案顶到列表最前，
+// 看起来像内容也改了。这里用「改名后 List 顺序不变」把这条约束钉住。
+func TestSchemeRenameKeepsUpdatedAt(t *testing.T) {
+	svc, repo := newSchemeSvc(t)
+
+	id1, err := repo.Insert(sampleScheme(0, "方案一"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 拉开写入时间，避免同秒内两次写入让排序断言失去区分度
+	time.Sleep(1100 * time.Millisecond)
+	if _, err := repo.Insert(sampleScheme(0, "方案二")); err != nil {
+		t.Fatal(err)
+	}
+
+	before, err := repo.Get(id1)
+	if err != nil || before == nil {
+		t.Fatalf("get scheme: %v", err)
+	}
+
+	if err := svc.RenameScheme(id1, "改名后的方案一"); err != nil {
+		t.Fatal(err)
+	}
+
+	after, err := repo.Get(id1)
+	if err != nil || after == nil {
+		t.Fatalf("get scheme after rename: %v", err)
+	}
+	if after.Name != "改名后的方案一" {
+		t.Errorf("名称未更新: %q", after.Name)
+	}
+	if !after.UpdatedAt.Equal(before.UpdatedAt) {
+		t.Errorf("改名不应刷新 updated_at: %v -> %v", before.UpdatedAt, after.UpdatedAt)
+	}
+	if after.Note != before.Note {
+		t.Errorf("备注被改动: %q -> %q", before.Note, after.Note)
+	}
+
+	// 内容（steps）与附图原样保留——Rename 不碰这两列
+	if len(after.Steps) != len(before.Steps) {
+		t.Errorf("步骤数被改动: %d -> %d", len(before.Steps), len(after.Steps))
+	}
+
+	list, err := svc.ListSchemes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("方案数 = %d, want 2", len(list))
+	}
+	if list[0].Name != "方案二" || list[1].Name != "改名后的方案一" {
+		t.Errorf("改名后列表顺序不应变化（按 updated_at 倒序）: %q, %q",
+			list[0].Name, list[1].Name)
+	}
+
+	// 空名称仍被拒绝，且不落库
+	if err := svc.RenameScheme(id1, "   "); err == nil {
+		t.Error("空名称应被拒绝")
+	}
+	// 不存在的方案报错而不是静默成功
+	if err := svc.RenameScheme(999999, "x"); err == nil {
+		t.Error("方案不存在时应报错")
+	}
+}
+
 // TestSchemeExportImport 导出与导入往返一致性测试。
 func TestSchemeExportImport(t *testing.T) {
 	svc, repo := newSchemeSvc(t)
