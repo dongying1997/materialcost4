@@ -43,11 +43,11 @@ type SchemeSummary struct {
 	HasResult bool `json:"hasResult"`
 	// ProductName 最终产物名（最后一步主产物的名称）
 	ProductName string `json:"productName"`
-	// UnitCost 最终产物单位成本（元/kg）= 总成本 ÷ 总产量
+	// UnitCost 最终产物单位成本（元/kg）= 最后一步总成本 ÷ 最后一步总产量
 	UnitCost float64 `json:"unitCost"`
-	// TotalCost 总成本（元）
+	// TotalCost 最后一步总成本（元）
 	TotalCost float64 `json:"totalCost"`
-	// TotalYieldKg 总产量（kg）
+	// TotalYieldKg 最后一步总产量（kg）
 	TotalYieldKg float64 `json:"totalYieldKg"`
 	// BlockingErrors 计算被阻塞的原因（如「底物缺少分子量」「底物投料量需大于 0」）
 	BlockingErrors []string `json:"blockingErrors"`

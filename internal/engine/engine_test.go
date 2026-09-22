@@ -227,17 +227,56 @@ func TestMultiStepInheritance(t *testing.T) {
 	if !approx(s2.Reagents[1].Cost, 6.6667, 1e-2) {
 		t.Errorf("C cost = %v", s2.Reagents[1].Cost)
 	}
-	// 总成本 = 10 + 8 + 6.667 = 24.667
-	if !approx(res.TotalCost, 24.6667, 1e-2) {
-		t.Errorf("total cost = %v, want 24.667", res.TotalCost)
+	// 汇总口径 = 最后一步：第二步成本 = 继承原料 8 + C 6.667 = 14.667
+	// （不是两步相加的 24.667 —— 第一步成本已通过继承原料的单价折算进来）
+	if !approx(res.TotalCost, 14.6667, 1e-2) {
+		t.Errorf("total cost = %v, want 14.667（最后一步）", res.TotalCost)
 	}
 	// 最后一步主产物产量 = 0.4 * 0.6 = 0.24 kg
 	if !approx(res.TotalYieldKg, 0.24, 1e-9) {
 		t.Errorf("total yield = %v, want 0.24", res.TotalYieldKg)
 	}
-	// 总单位成本 = 24.667 / 0.24 = 102.78
-	if !approx(res.TotalUnitCost, 102.778, 1e-2) {
-		t.Errorf("total unit cost = %v", res.TotalUnitCost)
+	// 总单位成本 = 14.667 / 0.24 = 61.11，与最后一步产物的单位成本同值
+	if !approx(res.TotalUnitCost, 61.111, 1e-2) {
+		t.Errorf("total unit cost = %v, want 61.111", res.TotalUnitCost)
+	}
+	if !approx(res.TotalUnitCost, s2.Products[0].UnitCost, 1e-9) {
+		t.Errorf("汇总单位成本 %v 与最后一步产物单位成本 %v 不一致（三个汇总值应同出一源）",
+			res.TotalUnitCost, s2.Products[0].UnitCost)
+	}
+	if !approx(res.TotalCost, s2.TotalCost, 1e-9) {
+		t.Errorf("汇总总成本 %v 与最后一步总成本 %v 不一致", res.TotalCost, s2.TotalCost)
+	}
+}
+
+// TestMultiStepTotalsFollowLastStep 汇总口径固定为最后一步：中间步骤再多，
+// 汇总值也只由最后一步决定（回归：曾把各步成本累加当「总成本」，与只取最后一步的产量对不上）。
+func TestMultiStepTotalsFollowLastStep(t *testing.T) {
+	// 三步方案，每步只投一点料，成本各不相同
+	steps := make([]models.ReactionStep, 0, 3)
+	for i := 0; i < 3; i++ {
+		steps = append(steps, models.ReactionStep{
+			Reagents: []models.ReagentInput{
+				{Name: "底物", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1),
+					Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
+			},
+			Products: []models.ProductInput{
+				{Name: "产物", MolWeight: 100, IsSubstrate: true, ActualYield: f(0.5)},
+			},
+		})
+	}
+	res := CalculateMultiStep(steps)
+	last := res.Steps[2]
+	// 中间步骤的产物按「成本 × 产量」继承，最后一步成本能被前两步拉高，
+	// 但汇总值必须等于最后一步那一个数。
+	if res.TotalCost != last.TotalCost {
+		t.Errorf("汇总总成本 = %v，期望最后一步的 %v", res.TotalCost, last.TotalCost)
+	}
+	if res.TotalYieldKg != last.PrimaryProduct.ActualYield {
+		t.Errorf("汇总总产量 = %v，期望最后一步的 %v", res.TotalYieldKg, last.PrimaryProduct.ActualYield)
+	}
+	if res.TotalUnitCost != last.Products[0].UnitCost {
+		t.Errorf("汇总单位成本 = %v，期望最后一步产物的 %v", res.TotalUnitCost, last.Products[0].UnitCost)
 	}
 }
 
@@ -315,7 +354,7 @@ func TestEquivFromAmountUsesContent(t *testing.T) {
 func TestEquivBackfilledUsesContentWhenEquivGiven(t *testing.T) {
 	reagents := []models.ReagentInput{
 		{Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1)}, // n0 = 10 mol
-		{Name: "B", MolWeight: 50, Content: 50, Equiv: f(1),                          // 10 mol → 纯品 0.5 kg，折 50% 需 1 kg
+		{Name: "B", MolWeight: 50, Content: 50, Equiv: f(1), // 10 mol → 纯品 0.5 kg，折 50% 需 1 kg
 			Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10}},
 	}
 	products := []models.ProductInput{

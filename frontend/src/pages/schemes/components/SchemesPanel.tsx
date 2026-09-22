@@ -30,9 +30,7 @@ function ResultSummary({ s }: { s: SchemeSummary }) {
     )
   }
   return (
-    <Tooltip title={`总成本 ${fmtMoney(s.totalCost)} 元 ÷ 总产量 ${fmtMoney(s.totalYieldKg)} kg`}>
       <span>{name} · <span style={{ fontWeight: 500 }}>{fmtMoney(s.unitCost)} 元/kg</span></span>
-    </Tooltip>
   )
 }
 

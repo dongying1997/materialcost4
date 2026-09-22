@@ -446,6 +446,56 @@ func TestListSchemesSummary(t *testing.T) {
 	}
 }
 
+// TestListSchemesMultiStepSummaryUsesLastStep 摘要的三个汇总值必须同出一源：
+// 都取最后一步，这样前端 Tooltip 的「X 元 ÷ Y kg」才与展示的单位成本对得上。
+func TestListSchemesMultiStepSummaryUsesLastStep(t *testing.T) {
+	svc, repo := newSchemeSvc(t)
+	steps := []models.ReactionStep{
+		{
+			StepNum: 1,
+			Reagents: []models.ReagentInput{{
+				Name: "A", MolWeight: 100, Content: 100, IsSubstrate: true, AmountKg: f(1),
+				Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 10},
+			}},
+			Products: []models.ProductInput{{Name: "中间体", MolWeight: 120, IsSubstrate: true, WeightYield: f(50)}},
+		},
+		{
+			StepNum: 2,
+			Reagents: []models.ReagentInput{
+				{Name: "中间体", MolWeight: 120, Inherited: true, IsSubstrate: true, AmountKg: f(0.4)},
+				{Name: "C", MolWeight: 200, Content: 100, Equiv: f(2),
+					Price: &models.PriceSnapshot{UnitPriceYuanPerKg: 5}},
+			},
+			Products: []models.ProductInput{{Name: "终产物", MolWeight: 200, IsSubstrate: true, WeightYield: f(60)}},
+		},
+	}
+	sch := sampleScheme(0, "两步方案")
+	sch.Steps = steps
+	if _, err := repo.Insert(sch); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.ListSchemes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || !list[0].HasResult {
+		t.Fatalf("两步方案应算出结果: %+v", list[0])
+	}
+	got := list[0]
+	last := engine.CalculateMultiStep(steps).Steps[1]
+	if got.TotalCost != last.TotalCost {
+		t.Errorf("摘要总成本 = %v，期望最后一步的 %v（不应把各步成本累加）", got.TotalCost, last.TotalCost)
+	}
+	if got.TotalYieldKg != last.PrimaryProduct.ActualYield {
+		t.Errorf("摘要总产量 = %v，期望最后一步的 %v", got.TotalYieldKg, last.PrimaryProduct.ActualYield)
+	}
+	// 第二步的成本里已含继承原料（单价 20、投料 0.4），汇总只认这一步，不再回头累加第一步
+	if want := last.TotalCost / last.PrimaryProduct.ActualYield; got.UnitCost != want {
+		t.Errorf("摘要单位成本 = %v，期望 %v", got.UnitCost, want)
+	}
+}
+
 // TestListSchemesEmptySteps 没有步骤的方案不应让列表接口报错。
 func TestListSchemesEmptySteps(t *testing.T) {
 	svc, repo := newSchemeSvc(t)

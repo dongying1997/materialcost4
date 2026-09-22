@@ -111,15 +111,17 @@ func CalculateMultiStep(steps []models.ReactionStep) *MultiStepResult {
 		}
 		sr := CalculateStep(step, prev)
 		out.Steps = append(out.Steps, sr)
-		out.TotalCost += sr.TotalCost
 		if sr.PrimaryProduct != nil {
 			prev = sr.PrimaryProduct
 		} else {
 			prev = nil
 		}
 	}
+	// 汇总口径：全部取最后一步（见 MultiStepResult 的注释），
+	// 因此这里只读最后一步，不做跨步累加。
 	if n := len(out.Steps); n > 0 {
 		last := out.Steps[n-1]
+		out.TotalCost = last.TotalCost
 		if last.PrimaryProduct != nil {
 			out.TotalYieldKg = last.PrimaryProduct.ActualYield
 		}

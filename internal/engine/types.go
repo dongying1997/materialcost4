@@ -73,12 +73,19 @@ type StepResult struct {
 }
 
 // MultiStepResult 多步反应的完整结果。
+//
+// 口径约定：下方三个汇总值一律取「最后一步」（最终产物所在的那一步），
+// 与各步的 StepResult 同口径 —— 这样列表里「总成本 ÷ 总产量 = 单位成本」
+// 三个数能对得上，分子分母都出自同一步。
+// 中间步骤的物料成本不是在最后一步投的，硬加进分母对不上的分子里会得出虚高的单价
+// （因为中间体是以「成本 × 收率」的形式被继承到下一步的）；
+// 多步的全局总投入若要展示，应由各步 TotalCost 单独汇总，不要混进这里。
 type MultiStepResult struct {
 	Steps []*StepResult `json:"steps"`
-	// 总成本（元）= 各步总成本之和
+	// （最终产物所在的）最后一步总成本（元）
 	TotalCost float64 `json:"totalCost"`
-	// 总产量（kg）= 最后一步主产物实际产量
+	// 最后一步主产物实际产量（kg）
 	TotalYieldKg float64 `json:"totalYieldKg"`
-	// 总单位成本（元/kg）= 总成本 ÷ 总产量
+	// 最后一步单位成本（元/kg）= TotalCost ÷ TotalYieldKg
 	TotalUnitCost float64 `json:"totalUnitCost"`
 }
