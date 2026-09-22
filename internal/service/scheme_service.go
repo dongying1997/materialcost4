@@ -166,6 +166,24 @@ func (s *SchemeService) SaveScheme(sch *models.Scheme) (*models.Scheme, error) {
 	return s.schemeRepo.Get(sch.ID)
 }
 
+// CreateScheme 只新增、绝不更新已有行（id 一律忽略）。
+//
+// 「另存为」走这条路径而不是 SaveScheme：后者 id > 0 时是整行更新，
+// 万一前端传错 id 就会把原方案悄悄覆盖掉。另存为的语义是「一定产生新行」，
+// 用这个接口能在服务端把这条语义钉死，不依赖调用方传对 id。
+func (s *SchemeService) CreateScheme(sch *models.Scheme) (*models.Scheme, error) {
+	sch.Name = strings.TrimSpace(sch.Name)
+	if sch.Name == "" {
+		return nil, fmt.Errorf("方案名称不能为空")
+	}
+	sch.ID = 0
+	id, err := s.schemeRepo.Insert(sch)
+	if err != nil {
+		return nil, err
+	}
+	return s.schemeRepo.Get(id)
+}
+
 // RenameScheme 只改方案名称（顺带保留备注），不刷新 updated_at。
 //
 // 有意不复用 SaveScheme：那条路径是「整行更新 + 刷新 updated_at」，

@@ -8,6 +8,13 @@ import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '@/types'
 import { stepsToPayload, stepsFromScheme, newStep } from '@/lib/reaction'
 import { fileToBase64 } from '@/shared/utils/file'
 
+/** 已载入/已保存方案在库中的身份。编辑器据此决定「保存」是写回还是新建。 */
+export interface SchemeMeta {
+  id: number
+  name: string
+  note: string
+}
+
 // 定义SchemeApi接口
 export interface SchemeApi {
   schemes: SchemeSummary[]
@@ -19,7 +26,10 @@ export interface SchemeApi {
   /** 改名请求进行中（用于弹窗确认按钮的 loading） */
   renamingSaving: boolean
   loadSchemes: () => void
-  saveScheme: (name: string, note: string, steps: StepRow[], image: string) => Promise<boolean>
+  /** 保存：id > 0 写回该行，id 为 0 新建。返回落库后的方案 */
+  saveScheme: (name: string, note: string, steps: StepRow[], image: string, id: number) => Promise<Scheme | null>
+  /** 另存为：只新增一行，绝不覆盖已有方案 */
+  saveSchemeAs: (name: string, note: string, steps: StepRow[], image: string) => Promise<Scheme | null>
   loadSchemeById: (id: number) => Promise<void>
   deleteSchemeById: (id: number) => Promise<void>
   openRename: (s: SchemeSummary) => void
@@ -34,12 +44,14 @@ export interface SchemeApi {
 
 /**
  * 方案管理：加载方案列表、保存 / 载入 / 改名 / 删除方案。
- * @param onLoaded 载入方案后的回调（把步骤注入编辑器）
+ * @param onLoaded 载入方案后的回调（把步骤注入编辑器）。
+ * 带上方案 id 与名称：编辑器据此把「保存方案」变成写回这一行，
+ * 而不是每次都新建（见 ReactionPage 的 currentScheme）。
  * @returns SchemeApi
  */
 export function useSchemes(
   messageApi: MessageInstance,
-  onLoaded: (rows: StepRow[], image: string) => void,
+  onLoaded: (rows: StepRow[], image: string, meta: SchemeMeta) => void,
 ): SchemeApi {
   const [schemes, setSchemes] = useState<SchemeSummary[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -59,20 +71,39 @@ export function useSchemes(
   }, [messageApi])
   useEffect(() => { loadSchemes() }, [loadSchemes])
 
-  const saveScheme = async (name: string, note: string, steps: StepRow[], image: string): Promise<boolean> => {
+  // id > 0 时写回那一行（后端 SaveScheme 的整行更新），id 为 0 时新建
+  const saveScheme = async (name: string, note: string, steps: StepRow[], image: string, id: number): Promise<Scheme | null> => {
     const payload: SchemePayload = {
-      id: 0, name, note, image,
+      id, name, note, image,
       steps: stepsToPayload(steps),
       // 时间字段由后端生成，不发送（空字符串会触发 time.Time 反序列化报错）
     }
     try {
-      await SchemeService.SaveScheme(payload as Scheme)
-      messageApi.success('方案已保存')
+      const saved = await SchemeService.SaveScheme(payload as Scheme)
+      messageApi.success(id > 0 ? '方案已保存' : '方案已新建')
       loadSchemes()
-      return true
+      return saved as Scheme | null
     } catch (e) {
       messageApi.error(String(e))
-      return false
+      return null
+    }
+  }
+
+  // 另存为走 CreateScheme 而不是传 id:0 给 SaveScheme：后者在 id 传错时
+  // 会整行覆盖已有方案，而另存为的语义是「一定产生新行」，交给服务端钉死。
+  const saveSchemeAs = async (name: string, note: string, steps: StepRow[], image: string): Promise<Scheme | null> => {
+    const payload: SchemePayload = {
+      id: 0, name, note, image,
+      steps: stepsToPayload(steps),
+    }
+    try {
+      const created = await SchemeService.CreateScheme(payload as Scheme)
+      messageApi.success('已另存为新方案')
+      loadSchemes()
+      return created as Scheme | null
+    } catch (e) {
+      messageApi.error(String(e))
+      return null
     }
   }
 
@@ -83,7 +114,8 @@ export function useSchemes(
       if (!full) return
       const rows = stepsFromScheme(full.steps)
       // 图片为空串表示该方案没附图——此时应清掉当前图，否则会把上一张图带进新方案
-      onLoaded(rows.length ? rows : [newStep()], full.image || '')
+      onLoaded(rows.length ? rows : [newStep()], full.image || '',
+        { id: full.id, name: full.name, note: full.note })
       messageApi.success(`已载入方案「${full.name}」`)
     } catch (e) {
       messageApi.error(String(e))
@@ -188,7 +220,7 @@ export function useSchemes(
 
   return {
     schemes, selectedIds, exporting, importing, renaming, renamingSaving,
-    loadSchemes, saveScheme, loadSchemeById, deleteSchemeById,
+    loadSchemes, saveScheme, saveSchemeAs, loadSchemeById, deleteSchemeById,
     openRename, closeRename, renameScheme,
     toggleSelect, clearSelection, exportSchemes, importSchemes, deleteSelected,
   }

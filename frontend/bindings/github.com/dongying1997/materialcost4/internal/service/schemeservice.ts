@@ -19,6 +19,17 @@ import * as models$0 from "../models/models.js";
 import * as $models from "./models.js";
 
 /**
+ * CreateScheme 只新增、绝不更新已有行（id 一律忽略）。
+ * 
+ * 「另存为」走这条路径而不是 SaveScheme：后者 id > 0 时是整行更新，
+ * 万一前端传错 id 就会把原方案悄悄覆盖掉。另存为的语义是「一定产生新行」，
+ * 用这个接口能在服务端把这条语义钉死，不依赖调用方传对 id。
+ */
+export function CreateScheme(sch: models$0.Scheme | null): $CancellablePromise<models$0.Scheme | null> {
+    return $Call.ByID(2108796309, sch);
+}
+
+/**
  * DeleteScheme 删除方案。
  */
 export function DeleteScheme(id: number): $CancellablePromise<void> {
