@@ -11,11 +11,15 @@ Wails v3 desktop app — Go backend + React/TypeScript frontend for chemical mat
 │   ├── engine/          #   Pure-function calculation engine (unit-tested)
 │   ├── models/          #   Shared data models
 │   └── service/         #   Wails-exposed services (CRUD, Excel I/O)
-├── frontend/src/        # React frontend
-│   ├── components/      #   Reusable UI components (PascalCase.tsx)
-│   ├── pages/           #   Top-level page components
-│   ├── hooks/           #   Custom hooks (useXxx.ts)
-│   └── utils/           #   Frontend helpers
+├── frontend/src/        # React frontend，按页面域组织
+│   ├── app/             #   应用外壳：App.tsx（路由/布局）+ NavMenu.tsx
+│   ├── pages/           #   每页一块，独占组件与 hook 都在自己目录下
+│   │   ├── materials/   #     MaterialsPage / useMaterials / components/
+│   │   ├── reaction/    #     ReactionPage / useReactionCalc / components/
+│   │   └── schemes/     #     SchemesPage / components/
+│   ├── shared/          #   跨页面共用：components / hooks / utils
+│   ├── lib/             #   bindings 出口与 reaction 业务换算
+│   └── types/           #   index.ts（Wails 类型）+ editor.ts（编辑行类型）
 ├── frontend/bindings/   # Auto-generated Wails TS bindings (do not edit)
 └── build/               # Platform build configs
 ```
