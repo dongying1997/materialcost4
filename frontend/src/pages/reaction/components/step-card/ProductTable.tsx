@@ -1,9 +1,11 @@
 // 产物表：每行一种产物。列宽与原料表共享同一套常量（见 ./constants），两表逐列对齐是刻意约束。
+import { useMemo } from 'react';
 import { Table, Radio, Select, Input, Tooltip, Button } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import type { StepRow, ProductRow, MaterialWithPrice, StepResult } from '@/types';
 import { fmtMoney } from '@/shared/utils/format';
+import { createMaterialShowSearch } from '@/shared/utils/materialSearch';
 import { normalize } from '@/shared/utils/decimal';
 import DecimalInput from '@/shared/components/DecimalInput';
 import ReadOnlyCell from './ReadOnlyCell';
@@ -38,6 +40,10 @@ interface Props {
 export default function ProductTable({ step, materials, result, rows, hoverActions }: Props) {
   const { updateProduct, markPrimary, removeProduct } = rows;
   const pr = (i: number) => result?.products?.[i] || undefined;
+  // 物料下拉的筛选与排序：与物料管理页同一套接近度打分（精确 > 前缀 > 包含，同级最新在前）。
+  // useMemo 不只是省事——rc-select 把 filterOption/filterSort 当 memo 依赖，每次渲染
+  // 都新建一对函数会让它的内部记忆全部失效。
+  const materialSearch = useMemo(() => createMaterialShowSearch(materials), [materials]);
 
   const columns: ColumnsType<ProductRow> = [
     {
@@ -79,16 +85,12 @@ export default function ProductTable({ step, materials, result, rows, hoverActio
           allowClear
           style={fullInput}
           placeholder='从物料库选'
-          // 顶层的 optionFilterProp / filterOption 已弃用，改挂 showSearch（对象形式自 6.0.0 起支持）
-          showSearch={{
-            optionFilterProp: 'label',
-            // 显示只有名称；搜索按「名称 + CAS」，因此输入 CAS 也能筛出物料
-            filterOption: (input, option) => {
-              const m = materials.find((x) => x.id === (option as { value?: number })?.value);
-              const hay = `${m?.name ?? ''} ${m?.cas ?? ''}`.toLowerCase();
-              return hay.includes(input.trim().toLowerCase());
-            },
-          }}
+          // 顶层的 optionFilterProp / filterOption 已弃用，改挂 showSearch（对象形式自 6.0.0 起支持）。
+          // 筛选与排序都走物料库那套（编码/名称/CAS/化学式/备注，精确 > 前缀 > 包含，
+          // 同级最新在前），同一个关键字与物料管理页排出同一顺序——
+          // 见 shared/utils/materialSearch.ts。注意命中字段不一定在 label 上
+          // （编码/化学式/备注命中时，下拉项上看不出为什么会匹配）。
+          showSearch={materialSearch}
           value={p.materialId || undefined}
           // 列宽只有 COL_SEL，按列宽弹出的下拉装不下「名称 + CAS」，两者都会被截断。
           // 解绑列宽后由 materialSelect.css 给定固定宽度。

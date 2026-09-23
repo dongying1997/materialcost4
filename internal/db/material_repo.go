@@ -120,6 +120,10 @@ func (r *MaterialRepo) Get(id int64) (*models.Material, error) {
 //   - 有关键字：与关键字的接近度高的在前（精确 > 前缀 > 包含），同级再按最新在前。
 //     纯字母序在搜索结果里没有意义——用户是带着一个具体查询来的，
 //     最想要的是「哪个才是我要找的那条」，而不是它们按名称怎么排。
+//
+// 这套打分前端复刻了一份：反应计算页的物料下拉是「一次性拉全库、本地过滤」，
+// 拿不到这里的排序，只能在前端重算，否则同一个关键字两个页面排出两种顺序。
+// 位置：frontend/src/shared/utils/materialSearch.ts——改档位或字段时两处要同步。
 func (r *MaterialRepo) List(keyword string) ([]*models.Material, error) {
 	const cols = `id,code,name,cas,formula,mol_weight,content,recovery_rate,note,created_at,updated_at`
 	q := `SELECT ` + cols + ` FROM materials`

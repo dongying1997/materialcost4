@@ -1,6 +1,8 @@
+import { useMemo } from 'react'
 import { Button, Select, Tooltip } from 'antd'
 import { LinkOutlined } from '@ant-design/icons'
 import type { MaterialWithPrice, ReagentRow } from '@/types'
+import { createMaterialShowSearch } from '@/shared/utils/materialSearch'
 
 /**
  * 原料「名称」单元格。
@@ -122,6 +124,9 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
     const { bound, unbound, sameName, canAutoLink } = state
     const hints = nameHints(r, state)
     const options = materialOptions(materials, state, r.name)
+    // 筛选与排序同物料管理页（见 shared/utils/materialSearch.ts）。本组件按行渲染，
+    // useMemo 让按 id 建的索引表随「行实例 × 物料集」只建一次，而不是每次渲染重建。
+    const materialSearch = useMemo(() => createMaterialShowSearch(materials), [materials])
 
     const select = (
         <Select
@@ -130,15 +135,12 @@ function ReagentNameCell({ row: r, materials, onPick, onClear }: Props) {
             // 故解绑列宽，宽度与锚点交给 materialSelect.css
             popupMatchSelectWidth={false}
             classNames={{ popup: { root: 'material-select-popup' } }}
-            showSearch={{
-                optionFilterProp: 'label',
-                // 显示只有名称（避免长名称被 CAS 挤掉），但搜索按「名称 + CAS」，CAS 依然可搜
-                filterOption: (input, option) => {
-                    const m = materials.find(x => x.id === (option as { value?: number })?.value)
-                    const hay = `${m?.name ?? ''} ${m?.cas ?? ''}`.toLowerCase()
-                    return hay.includes(input.trim().toLowerCase())
-                },
-            }}
+            // 与「选物料」列同一套筛选与排序：编码/名称/CAS/化学式/备注，精确 > 前缀 >
+            // 包含，同级最新在前——见 shared/utils/materialSearch.ts。命中字段不一定在
+            // label 上（编码/化学式/备注命中时看不出为什么会匹配）。
+            // 未关联行的哨兵项（value = -1）不在物料库里，输入关键字时会被滤掉；
+            // 关键字为空时排序不生效，稳定排序让它留在 unshift 的位置（最前）。
+            showSearch={materialSearch}
             // 选中值取 displayName（名称），下拉项仍用 label（名称 + CAS）
             optionLabelProp='displayName'
             value={bound ? r.materialId : (unbound ? UNBOUND_MATERIAL : undefined)}

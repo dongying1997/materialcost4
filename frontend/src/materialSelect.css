@@ -1,5 +1,8 @@
 /* 物料下拉（原料名称 / 选物料两列）。
  *
+ * 两列还共用同一套搜索（匹配字段与排序）——见 shared/utils/materialSearch.ts，
+ * 改搜索只改那一处，别在调用点各写一份。
+ *
  * 这两列都很窄（COL_SEL = 94），下拉若按列宽弹出，「名称 + CAS」会被截掉一半，
  * 所以两处都设了 popupMatchSelectWidth={false}，宽度改由这里定。
  *
