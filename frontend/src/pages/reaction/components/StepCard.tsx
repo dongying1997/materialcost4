@@ -7,6 +7,7 @@ import type {
   MaterialWithPrice, StepResult, ReagentRow, StepRow, IntermediateProduct, PriceSnapshot,
 } from '@/types'
 import { normalize, toNumber } from '@/shared/utils/decimal'
+import { fmtMoney } from '@/shared/utils/format'
 import { COL_NAME } from './step-card/constants'
 import ReagentTable from './step-card/ReagentTable'
 import ProductTable from './step-card/ProductTable'
@@ -78,6 +79,11 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
     onPriceOptions?.(materialId)
   }
 
+  // 主产物 = 被标记为底物的那个产物（每步最多一个），引擎也用它作为「本步成本」的除数，
+  // 是下一步继承的来源。不能假定它在 products[0]：产品的行序是用户可改的。
+  const primaryIdx = step.products.findIndex(p => p.isSubstrate)
+  const primaryResult = primaryIdx >= 0 ? result?.products?.[primaryIdx] : undefined
+
   const inheritedExists = step.reagents.some(r => r.inherited)
   const hasBlocking = !!result && (result.blockingErrors || []).length > 0
   const warnings = result?.warnings || []
@@ -145,7 +151,14 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
       extra={
         <Space>
           <span style={{ fontSize: 14, color: '#999' }}>
-            本步总成本：
+            {/* 主产物单位成本 = 本步总成本 ÷ 主产物产量，与产物表「单位成本」列同一口径 */}
+            主产物单位成本：
+            <b style={{ color: '#1677ff', marginLeft: 4 }}>
+              {primaryResult ? fmtMoney(primaryResult.unitCost) : '-'} 元/kg
+            </b>
+          </span>
+          <span style={{ fontSize: 14, color: '#999' }}>
+            本步成本：
             {/* 总成本只精确到元（个位），金额取整显示，避免标题栏被小数撑长 */}
             <b style={{ color: '#1677ff', marginLeft: 4 }}>
               {result ? Math.round(result.totalCost).toLocaleString('zh-CN') : '-'} 元
