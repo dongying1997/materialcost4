@@ -250,12 +250,15 @@ export default function ReagentTable({
                   <div style={{ fontSize: 11, color: '#999' }}>{fmtNum(stepPct, 1)}%</div>
                 </Tooltip>
               ) : (
-                <Tooltip title='物料在本步成本中的占比 / 物料在总成本中的占比'>
                   <div style={{ fontSize: 11, color: '#999' }}>
-                    {fmtNum(stepPct, 1)}% <span style={{ color: '#ccc' }}>/</span>{' '}
-                    <span style={{ color: '#333' }}>{fmtNum(totalPct, 1)}%</span>
+                    <Tooltip title='物料在本步成本中的占比'>
+                      <span style={{ color: '#ccc' }}>{fmtNum(stepPct, 1)}% </span>
+                    </Tooltip>
+                    <span>{'/ '}</span>
+                    <Tooltip title='物料在总成本中的占比'>
+                      <span style={{ color: '#333' }}>{fmtNum(totalPct, 1)}%</span>
+                    </Tooltip>
                   </div>
-                </Tooltip>
               ))}
           </div>
         );
