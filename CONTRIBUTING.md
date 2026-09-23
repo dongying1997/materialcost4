@@ -113,7 +113,7 @@ wails3 task common:update:build-assets
 | 字段 | 生成器会写回 | 应当保持 |
 |------|-------------|---------|
 | `homepage` | `https://wails.io` | 本仓库地址 |
-| `license` | `MIT` | `Proprietary`（见 [README 的「许可」](README.md#许可)，本项目尚未添加开源许可证，声明 MIT 属虚假许可）|
+| `license` | `MIT` | `PolyForm-Noncommercial-1.0.0`（见 [LICENSE](LICENSE)，本项目仅限非商业用途，写成 MIT 是错误的许可声明）|
 
 其余生成物（各 `Info.plist`、`info.json`、`wails_tools.nsh`、`wails.exe.manifest`）纯由模板生成，只有版本号会变，可以直接接受。
 

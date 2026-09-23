@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build:dev": "tsc && vite build --minify false --mode development",
+    "prebuild:dev": "npm run sync:licenses",
     "build": "tsc && vite build --mode production",
-    "preview": "vite preview"
+    "prebuild": "npm run sync:licenses",
+    "preview": "vite preview",
+    "sync:licenses": "node -e \"const{cpSync}=require('fs');cpSync('../LICENSE','public/LICENSE');cpSync('../THIRD-PARTY-NOTICES.md','public/THIRD-PARTY-NOTICES.md')\""
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",

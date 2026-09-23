@@ -13,7 +13,7 @@ maintainer: ${GIT_COMMITTER_NAME} <${GIT_COMMITTER_EMAIL}>
 description: "化学反应的物料成本计算工具"
 vendor: "dongying1997"
 homepage: "https://github.com/dongying1997/materialcost4"
-license: "Proprietary"
+license: "PolyForm-Noncommercial-1.0.0"
 release: "1"
 
 contents:
@@ -80,6 +80,6 @@ scripts:
 # changelog: "changelog.yaml"
 
 # ⚠️ 本文件是 `wails3 task common:update:build-assets` 的产物，生成器每次都会把上面两行
-# 覆盖回模板默认值（homepage → https://wails.io、license → MIT）。本项目尚未添加 LICENSE，
-# 声明 MIT 是虚假许可声明（见 README「许可」一节）。生成器会重写整个文件，
-# 所以这段提醒只能留在末尾，放在可识别的结尾处，才能看出这次改过没有。
+# 覆盖回模板默认值（homepage → https://wails.io、license → MIT）。本项目实际许可是
+# PolyForm-Noncommercial-1.0.0（见仓库根的 LICENSE），写成 MIT 是错误的许可声明。生成器会重写整个
+# 文件，所以这段提醒只能留在末尾，放在可识别的结尾处，才能看出这次改过没有。

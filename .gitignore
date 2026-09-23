@@ -4,6 +4,11 @@ bin
 frontend/dist
 frontend/node_modules
 
+# frontend/public 下的许可证是构建时从仓库根拷贝过去的（见 package.json 的
+# sync:licenses），由 prebuild / prebuild:dev 在每次构建前同步，不入库以免两份漂移
+frontend/public/LICENSE
+frontend/public/THIRD-PARTY-NOTICES.md
+
 # build/ 是构建脚手架：各平台 Taskfile、图标、Info.plist、打包配置
 # （NSIS / nfpm / msix）以及 docker 交叉编译镜像定义，全部必须入库，
 # 否则全新克隆无法执行 `wails3 build` / `wails3 package`。
