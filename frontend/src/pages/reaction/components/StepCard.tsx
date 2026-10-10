@@ -91,7 +91,7 @@ function StepCard({ index, step, materials, result, totalShareMultiplier = 1, pr
   return (
     <Card
       size='small'
-      style={{ marginBottom: 12 }}
+      style={{ marginBottom: 1 }}
       styles={{ body: { padding: '8px 12px 10px' } }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

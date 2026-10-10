@@ -6,7 +6,7 @@ import type {
 import { normalize, toNumber } from '@/shared/utils/decimal'
 
 /** 价格快照与库中最新价的差异阈值（元/kg），超过则提示用户 */
-export const PRICE_DRIFT_THRESHOLD = 0.01
+export const PRICE_DRIFT_THRESHOLD = 0.1
 
 /** 空快照（未设置价格） */
 export const emptyPrice = (): PriceSnapshot => ({

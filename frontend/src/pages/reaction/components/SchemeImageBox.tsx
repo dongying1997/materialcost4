@@ -64,7 +64,7 @@ function SchemeImageBox({ image }: Props) {
   return (
     <div
       ref={wrapRef}
-      style={{ marginBottom: 12, display: 'flex', flexDirection: 'column' }}
+      style={{ marginBottom: 1, display: 'flex', flexDirection: 'column' }}
     >
       {/* 没有图片就不占位：空框会把 StepCard 往下挤，而它本身不传递信息 */}
       {!image ? null : (

@@ -26,7 +26,7 @@ function App() {
             </div>
             <NavMenu />
           </Header>
-          <Content style={{ padding: 16, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <Content style={{ padding:1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <Routes>
               <Route path="/" element={<Navigate to="/materials" replace />} />
               <Route path="/materials" element={<MaterialsPage />} />

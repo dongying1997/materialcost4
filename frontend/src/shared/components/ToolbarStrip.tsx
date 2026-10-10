@@ -16,7 +16,7 @@ interface Props {
  * 用 flex + 居中对齐：工具栏里的破坏性操作靠子元素的 `marginLeft: 'auto'`
  * 推到最右，居中模式下该外边距依然生效。
  */
-function ToolbarStrip({ children, marginBottom = 8 }: Props) {
+function ToolbarStrip({ children, marginBottom = 1 }: Props) {
   return (
     <div style={{
       display: 'flex',
@@ -26,7 +26,7 @@ function ToolbarStrip({ children, marginBottom = 8 }: Props) {
       marginBottom,
       padding: '10px 12px',
       background: '#ffffff',
-      borderRadius: 8,
+      borderRadius: 2,
     }}>
       {children}
     </div>
