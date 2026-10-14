@@ -7,14 +7,15 @@ import type {
 } from '@/types'
 import { newStep, stepsToPayload, backfillFromResult, upsertPriceOptions } from '@/lib/reaction'
 import { usePersistedState } from '@/shared/hooks/useStorage'
+import { SchemeMeta } from '@/types/schemeMeta'
 
-// 存储键带 v2：高精度改造把编辑行的数值字段从 number 换成了 DecStr。
-// 换键让老格式直接失效（否则旧 number 数据既取不出来也写不回去），
-// 代价只是用户升级后需要重填一次当前草稿——方案（数据库）不受影响。
+// 存储stepScheme数据。
 const STORAGE_KEY = 'materialcost4:reaction-steps:v2'
-// 图片单独存一个键，不塞进 steps：图片是大字符串，混在步骤里会让每次步骤改动
-// 都连带重写整张图，也让「载入方案」时步骤与图片的更新来源纠缠不清。
+// 图片单独存一个键
 const IMAGE_KEY = 'materialcost4:reaction-image:v1'
+// 库内身份（id/name/note）做持久化，避免组件卸载时丢失
+const SCHEME_KEY = 'materialcost4:reaction-scheme:v1'
+
 
 
 export interface ReactionCalcApi {
@@ -35,6 +36,10 @@ export interface ReactionCalcApi {
   ensurePriceOptions: (materialId: number) => void
   /** 重新拉取物料库。新增物料后调用，否则新物料不在下拉候选里 */
   reloadMaterials: () => void
+  /** 当前方案的库内身份；id 为 0 表示尚未落库 */
+  scheme: SchemeMeta
+  setScheme: (value: SchemeMeta | ((prev: SchemeMeta) => SchemeMeta)) => void
+
 }
 
 /** 反应计算主状态：步骤编辑行、物料库、计算结果与实时计算（步骤内容持久化到 localStorage） */
@@ -45,6 +50,9 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   const [calculating, setCalculating] = useState(false)
   // 方案附图（完整 dataURL）。随方案保存 / 载入 / 导出。
   const [image, setImage] = usePersistedState(IMAGE_KEY, '')
+  // 当前方案在库中的身份。默认 { id: 0 } = 尚未落库（保存要弹窗命名、另存不可用）
+  const [scheme, setScheme] = usePersistedState<SchemeMeta>(SCHEME_KEY, { id: 0, name: '', note: '' })
+
   const priceOptionsCache = useRef<Record<number, MaterialPriceOption[]>>({})
 
   // 初始化一步
@@ -53,7 +61,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
   }, [steps.length])
 
 
-  
+
 
   // 加载物料库
   const loadMaterials = useCallback(async () => {
@@ -107,7 +115,7 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     setSteps(prev => {
       if (j < 0 || j >= prev.length) return prev
       const a = [...prev]
-      ;[a[i], a[j]] = [a[j], a[i]]
+        ;[a[i], a[j]] = [a[j], a[i]]
       return a
     })
   }
@@ -115,7 +123,11 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     setSteps([newStep()])
     setResult(null)
     setImage('')
+    // 身份也要一并清掉：否则清空后工具栏还挂着旧方案名、另存仍可用，
+    // 接着编辑再保存会把新内容写回旧方案行
+    setScheme({ id: 0, name: '', note: '' })
   }
+
 
   // 拉取某物料的历史价格（库仅作查询来源）。
   // 写入所有引用该物料的行，这样「库价 vs 方案快照」的差异提示在每行都能显示。
@@ -153,5 +165,6 @@ export function useReactionCalc(messageApi: MessageInstance): ReactionCalcApi {
     steps, setSteps, materials, result, calculating,
     updateStep, addStep, removeStep, moveStep, clearAll, image, setImage,
     recalculate, ensurePriceOptions, reloadMaterials: loadMaterials,
+    scheme, setScheme
   }
 }

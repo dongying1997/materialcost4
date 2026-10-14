@@ -5,7 +5,7 @@ import { useSchemes } from '@/shared/hooks/useSchemes'
 import SchemesPanel from '@/pages/schemes/components/SchemesPanel'
 import SchemesToolbar from '@/pages/schemes/components/SchemesToolbar'
 import SchemeRenameModal from '@/pages/schemes/components/SchemeRenameModal'
-import type { SchemeMeta } from '@/shared/hooks/useSchemes'
+import type { SchemeMeta } from '@/types/schemeMeta'
 import type { StepRow } from '@/types'
 
 /** 方案管理页：列出已保存的方案，载入后跳转到反应计算页 */

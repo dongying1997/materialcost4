@@ -10,28 +10,37 @@ import SchemeModals from '@/pages/reaction/components/SchemeModals'
 import { chainMultipliers } from '@/lib/reaction'
 import { useMaterialEditor } from '@/shared/hooks/useMaterialEditor'
 import MaterialEditModal from '@/shared/components/MaterialEditModal'
-import type { SchemeMeta } from '@/shared/hooks/useSchemes'
+import type { SchemeMeta } from '@/types/schemeMeta'
 import { usePasteImage } from '@/pages/reaction/usePasteImage'
 import type { Scheme, StepRow, StepResult } from '@/types'
 
 /** 反应计算编辑器页 */
 function ReactionPage() {
+  // 路由导航
   const navigate = useNavigate()
+
+  // 获取当前路由位置
   const location = useLocation()
+
+  // Ant Design 的通知API
   const [messageApi, contextHolder] = message.useMessage()
+
+  //  Ant Design 创建表单实例
   const [form] = Form.useForm()
+
+  // ”保存弹窗“是否打开的状态
   const [saveOpen, setSaveOpen] = useState(false)
+
   // 同一个弹窗服务两种意图：'save' 需要按当前 id 分流（改写回原行或新建），
   // 'saveAs' 一律新建。两者都要名称，所以共用表单，只在提交时分开。
   const [saveMode, setSaveMode] = useState<'save' | 'saveAs'>('save')
   const [loadOpen, setLoadOpen] = useState(false)
-  // 当前编辑的方案在库中的身份。id 为 0 = 尚未落库：
-  //   - 「保存方案」需要名称才能新建，故弹名称弹窗；
-  //   - 「另存为」无从另存，按钮禁用。
-  // 载入方案、保存成功、另存为成功都会刷新它。
-  const [currentScheme, setCurrentScheme] = useState<SchemeMeta>({ id: 0, name: '', note: '' })
 
+
+  // 注入计算器的依赖，获得计算器实例
   const calc = useReactionCalc(messageApi)
+  const { scheme: currentScheme, setScheme: setCurrentScheme } = calc
+
 
   // 每步成本在总成本中的链式乘数（供卡片展示原料占总成本比例）
   const multipliers = chainMultipliers(calc.steps, calc.result)

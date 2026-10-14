@@ -7,13 +7,8 @@ import { SchemeService } from '@/lib/bindings'
 import type { Scheme, SchemePayload, SchemeSummary, StepRow } from '@/types'
 import { stepsToPayload, stepsFromScheme, newStep } from '@/lib/reaction'
 import { fileToBase64 } from '@/shared/utils/file'
+import type { SchemeMeta } from '@/types/schemeMeta'
 
-/** 已载入/已保存方案在库中的身份。编辑器据此决定「保存」是写回还是新建。 */
-export interface SchemeMeta {
-  id: number
-  name: string
-  note: string
-}
 
 // 定义SchemeApi接口
 export interface SchemeApi {
